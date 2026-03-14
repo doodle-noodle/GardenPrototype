@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 public class PlacementController : MonoBehaviour
 {
@@ -8,21 +9,21 @@ public class PlacementController : MonoBehaviour
     public Material ghostValidMaterial;
     public Material ghostInvalidMaterial;
 
+    public static Material GhostValid   => Instance.ghostValidMaterial;
+    public static Material GhostInvalid => Instance.ghostInvalidMaterial;
+
     private LayerMask groundLayer;
     private PlaceableData currentData;
     private GameObject ghostObject;
     private bool isPlacing = false;
     private int ghostX, ghostZ;
     private bool placementValid;
+    private int framesToSkip = 0;  // prevents same click that opens placement from confirming it
 
     void Awake()
     {
         Instance = this;
         groundLayer = LayerMask.GetMask("Ground");
-        Debug.Log($"Ground layer mask: {groundLayer.value}");
-
-        foreach (var col in FindObjectsByType<Collider>(FindObjectsSortMode.None))
-            Debug.Log($"Collider: {col.gameObject.name} — layer: {LayerMask.LayerToName(col.gameObject.layer)}");
     }
 
     public void BeginPlacement(PlaceableData data)
@@ -30,13 +31,13 @@ public class PlacementController : MonoBehaviour
         if (isPlacing) CancelPlacement();
         currentData = data;
         isPlacing = true;
+        framesToSkip = 2;  // skip the next 2 frames of input
 
         ghostObject = Instantiate(data.prefab);
         SetGhostMaterials(ghostValidMaterial);
 
         foreach (var mb in ghostObject.GetComponentsInChildren<MonoBehaviour>())
             mb.enabled = false;
-
         foreach (var col in ghostObject.GetComponentsInChildren<Collider>())
             col.enabled = false;
     }
@@ -51,22 +52,29 @@ public class PlacementController : MonoBehaviour
     void Update()
     {
         if (ShopUI.IsOpen)
-    {
-        if (ghostObject) ghostObject.SetActive(false);
-        return;
-    }
+        {
+            if (ghostObject) ghostObject.SetActive(false);
+            return;
+        }
 
-    if (ghostObject) ghostObject.SetActive(true);
-
+        if (ghostObject) ghostObject.SetActive(true);
         if (!isPlacing) return;
 
+        // Count down the grace period frames
+        if (framesToSkip > 0)
+        {
+            framesToSkip--;
+            return;
+        }
+
+        // Don't process clicks that are over a UI element
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            return;
+
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-        Debug.DrawRay(ray.origin, ray.direction * 200f, Color.red);
-        Debug.Log($"Ground layer mask value: {groundLayer.value}");
 
         if (Physics.Raycast(ray, out RaycastHit hit, 200f, groundLayer))
         {
-            Debug.Log($"Hit: {hit.collider.gameObject.name}");
             Vector3 snapped = GridManager.Instance.SnapToGrid(hit.point);
             ghostObject.transform.position = snapped;
 
@@ -75,10 +83,6 @@ public class PlacementController : MonoBehaviour
                 currentData.gridWidth, currentData.gridHeight);
 
             SetGhostMaterials(placementValid ? ghostValidMaterial : ghostInvalidMaterial);
-        }
-        else
-        {
-            Debug.Log("Raycast hit nothing");
         }
 
         if (Input.GetMouseButtonDown(0) && placementValid)
