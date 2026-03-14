@@ -5,47 +5,39 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance;
 
-    public int coins = 20;
-    public int seedCost = 5;
-    public int cropValue = 15;
+    [Header("Economy")]
+    public int startingCoins = 50;
 
+    [Header("UI")]
     public TextMeshProUGUI coinText;
-    public GameObject shopPanel;
-    public bool shopOpen = false;
+    public GameObject placementUI;   // panel shown when placing
 
-    void Awake() => Instance = this;
+    private int coins;
+
+    void Awake()
+    {
+        Instance = this;
+        coins = startingCoins;
+    }
 
     void Start() => UpdateUI();
 
-    public void UpdateUI()
+    public bool SpendCoins(int amount)
     {
-        if (coinText != null)
-            coinText.text = "Coins: " + coins;
-    }
-
-    public bool BuySeed()
-    {
-        if (coins >= seedCost)
-        {
-            coins -= seedCost;
-            UpdateUI();
-            return true;
-        }
-        Debug.Log("Not enough coins!");
-        return false;
-    }
-
-    public void SellCrop()
-    {
-        coins += cropValue;
+        if (coins < amount) { Debug.Log("Not enough coins!"); return false; }
+        coins -= amount;
         UpdateUI();
-        Debug.Log("Sold crop! +" + cropValue + " coins");
+        return true;
     }
 
-    public void ToggleShop()
+    public void AddCoins(int amount)
     {
-        shopOpen = !shopOpen;
-        if (shopPanel != null)
-            shopPanel.SetActive(shopOpen);
+        coins += amount;
+        UpdateUI();
+    }
+
+    void UpdateUI()
+    {
+        if (coinText) coinText.text = $"Coins: {coins}";
     }
 }

@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 75096ee630c4ecb4e92dd7549d93a666, type: 3}
+  m_Name: FarmPlotPlaceable
+  m_EditorClassIdentifier: Assembly-CSharp::PlaceableData
+  placeableName: 
+  prefab: {fileID: 9072538423759121712, guid: e57c28d5ada525e40838e7a1483b8882, type: 3}
+  unlockCost: 20
+  gridWidth: 1
+  gridHeight: 1
