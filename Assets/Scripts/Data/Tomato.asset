@@ -12,19 +12,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 259e147521fc4e34e953efb332c42d83, type: 3}
   m_Name: Tomato
   m_EditorClassIdentifier: Assembly-CSharp::CropData
-  cropName: 
+  cropName: Tomato
   seedCost: 20
   sellValue: 80
   growthStages:
   - stageName: Seedling
-    duration: 0
+    duration: 6
     stageColor: {r: 0.5046352, g: 1, b: 0, a: 0}
-    scale: 0
+    scale: 0.3
   - stageName: Sprout
-    duration: 0
+    duration: 8
     stageColor: {r: 0.764151, g: 0.4651244, b: 0.18382876, a: 0}
-    scale: 0
+    scale: 0.5
   - stageName: Mature
     duration: 0
     stageColor: {r: 1, g: 0, b: 0.069642544, a: 0}
-    scale: 0
+    scale: 0.8

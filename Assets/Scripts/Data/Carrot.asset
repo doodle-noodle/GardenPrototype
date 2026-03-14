@@ -12,19 +12,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 259e147521fc4e34e953efb332c42d83, type: 3}
   m_Name: Carrot
   m_EditorClassIdentifier: Assembly-CSharp::CropData
-  cropName: 
+  cropName: Carrot
   seedCost: 5
   sellValue: 15
   growthStages:
   - stageName: Seedling
     duration: 3
     stageColor: {r: 0.5456797, g: 1, b: 0, a: 0}
-    scale: 0
+    scale: 0.3
   - stageName: Sprout
     duration: 4
     stageColor: {r: 0.8808007, g: 1, b: 0, a: 0}
-    scale: 0
+    scale: 0.5
   - stageName: Mature
     duration: 0
     stageColor: {r: 1, g: 0.5262718, b: 0, a: 0}
-    scale: 0
+    scale: 0.8
