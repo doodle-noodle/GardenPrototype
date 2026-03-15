@@ -111,6 +111,10 @@ public class FarmPlot : MonoBehaviour
             : ActiveCrop;
 
         var harvested = new HarvestedCrop(finalCrop, rank, mutated);
+        FloatingText.Spawn(
+            $"+{harvested.SellValue}  {RankUtility.RankLabel(rank)}",
+            transform.position + Vector3.up * 1.5f,
+            RankUtility.RankColor(rank));
         Inventory.Instance.AddHarvest(harvested);
 
         TutorialConsole.Log($"Harvested {RankUtility.RankLabel(rank)} " +

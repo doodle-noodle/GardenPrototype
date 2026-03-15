@@ -21,6 +21,8 @@ public class GameManager : MonoBehaviour
 
     void Start() => UpdateUI();
 
+    public bool CanAfford(int amount) => coins >= amount;
+
     public bool SpendCoins(int amount)
     {
         if (coins < amount)
@@ -40,9 +42,33 @@ public class GameManager : MonoBehaviour
         UpdateUI();
         EventBus.Raise_CoinsChanged(coins);
     }
+    private int     displayedCoins = 0;
+    private int     targetCoins    = 0;
+    private float   coinAnimTimer  = 0f;
+    private const float CoinAnimDuration = 0.4f;
 
     void UpdateUI()
     {
-        if (coinText) coinText.text = $"Coins: {coins}";
+        targetCoins = coins;
+        coinAnimTimer = 0f;
+    }
+
+    void Update()
+    {
+        if (displayedCoins != targetCoins)
+        {
+            coinAnimTimer += Time.deltaTime;
+            float t = Mathf.Clamp01(coinAnimTimer / CoinAnimDuration);
+            displayedCoins = (int)Mathf.Lerp(displayedCoins, targetCoins, t);
+
+            if (coinText) coinText.text = $"Coins: {displayedCoins}";
+
+            // Snap when close enough
+            if (Mathf.Abs(displayedCoins - targetCoins) <= 1)
+            {
+                displayedCoins = targetCoins;
+                if (coinText) coinText.text = $"Coins: {displayedCoins}";
+            }
+        }
     }
 }

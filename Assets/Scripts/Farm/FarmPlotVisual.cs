@@ -1,33 +1,53 @@
-﻿using UnityEngine;
+﻿using System.Collections;
+using UnityEngine;
 
 [RequireComponent(typeof(FarmPlot))]
 public class FarmPlotVisual : MonoBehaviour
 {
-    private FarmPlot plot;
+    private FarmPlot  plot;
     private FarmPlot.PlotState lastState;
-    private int lastStage = -1;
+    private int       lastStage = -1;
 
     private GameObject cropObject;
     private GameObject ghostObject;
 
+    private Renderer plotRenderer;
+    private Color    defaultPlotColor;
+
+    // ── Setup ─────────────────────────────────────────────────
+
     void Awake()
     {
-        plot      = GetComponent<FarmPlot>();
-        lastState = plot.State;
+        plot         = GetComponent<FarmPlot>();
+        lastState    = plot.State;
+        plotRenderer = GetComponent<Renderer>();
+
+        if (plotRenderer != null)
+            defaultPlotColor = plotRenderer.material.color;
     }
+
+    // ── Update ────────────────────────────────────────────────
 
     void Update()
     {
-        // Only rebuild the visual when something actually changed
         if (plot.StateChanged || plot.CurrentStage != lastStage || plot.State != lastState)
         {
             lastState = plot.State;
             lastStage = plot.CurrentStage;
             RefreshVisual();
         }
+
+        // Pulse crop visual when ready to harvest
+        if (plot.State == FarmPlot.PlotState.Ready && cropObject != null)
+        {
+            float pulse = 1f + Mathf.Sin(Time.time * 3f) * 0.08f;
+            GrowthStage stage = plot.ActiveCrop.growthStages[plot.CurrentStage];
+            float s = stage.scale * pulse;
+            cropObject.transform.localScale = new Vector3(s, s, s);
+        }
     }
 
-    // ── Hover ghost ───────────────────────────────────────────
+    // ── Hover ─────────────────────────────────────────────────
 
     public void OnHoverEnter()
     {
@@ -35,6 +55,10 @@ public class FarmPlotVisual : MonoBehaviour
         if (plot.State != FarmPlot.PlotState.Empty) return;
         if (Inventory.Instance.SelectedSeed == null) return;
         if (Inventory.Instance.GetSeedCount(Inventory.Instance.SelectedSeed) <= 0) return;
+
+        if (plotRenderer != null)
+            plotRenderer.material.color = defaultPlotColor * 1.3f;
+
         ShowGhost();
     }
 
@@ -45,8 +69,13 @@ public class FarmPlotVisual : MonoBehaviour
 
     public void OnHoverExit()
     {
+        if (plotRenderer != null)
+            plotRenderer.material.color = defaultPlotColor;
+
         HideGhost();
     }
+
+    // ── Ghost ─────────────────────────────────────────────────
 
     void ShowGhost()
     {
@@ -56,7 +85,6 @@ public class FarmPlotVisual : MonoBehaviour
         if (seed == null || seed.growthStages.Length == 0) return;
 
         GrowthStage firstStage = seed.growthStages[0];
-
         ghostObject = SpawnVisual(firstStage);
 
         if (PlacementController.GhostValid != null)
@@ -84,20 +112,45 @@ public class FarmPlotVisual : MonoBehaviour
         ClearCropVisual();
         cropObject = SpawnVisual(stage);
 
-        // Tint ready crops to make them obviously harvestable
+        // Tint ready crops yellow
         if (plot.State == FarmPlot.PlotState.Ready)
         {
             var rend = cropObject.GetComponent<Renderer>();
             if (rend != null)
-            {
                 rend.material.color = Color.Lerp(stage.stageColor, Color.yellow, 0.4f);
-            }
         }
+
+        // Scale pop on every stage change
+        StartCoroutine(ScalePop(cropObject, stage.scale));
     }
 
     void ClearCropVisual()
     {
         if (cropObject != null) { Destroy(cropObject); cropObject = null; }
+    }
+
+    // ── Scale pop coroutine ───────────────────────────────────
+
+    IEnumerator ScalePop(GameObject target, float finalScale)
+    {
+        if (target == null) yield break;
+
+        float elapsed  = 0f;
+        float duration = 0.25f;
+
+        while (elapsed < duration)
+        {
+            if (target == null) yield break;
+            elapsed += Time.deltaTime;
+            float t     = elapsed / duration;
+            float curve = Mathf.Sin(t * Mathf.PI);
+            float s     = finalScale + curve * finalScale * 0.35f;
+            target.transform.localScale = new Vector3(s, s, s);
+            yield return null;
+        }
+
+        if (target != null)
+            target.transform.localScale = Vector3.one * finalScale;
     }
 
     // ── Shared spawn helper ───────────────────────────────────

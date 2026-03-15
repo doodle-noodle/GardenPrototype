@@ -7,8 +7,6 @@ public class ShopUI : MonoBehaviour
 {
     public static ShopUI Instance;
     public static bool IsOpen { get; private set; }
-
-    [Header("Direct placeable references")]
     public PlaceableData farmPlotPlaceable;
 
     private GameObject      shopPanel;
@@ -119,24 +117,6 @@ public class ShopUI : MonoBehaviour
 
     #endregion
 
-    #region Buy Plot Button
-
-    public void OnBuyPlotClicked()
-    {
-        if (farmPlotPlaceable == null)
-        {
-            TutorialConsole.Error("Farm plot placeable not assigned in ShopUI.");
-            return;
-        }
-
-        if (!GameManager.Instance.SpendCoins(farmPlotPlaceable.unlockCost)) return;
-
-        PlacementController.Instance.BeginPlacement(farmPlotPlaceable);
-        TutorialConsole.Log("Click the grid to place your Farm Plot. Press Escape to cancel.");
-    }
-
-    #endregion
-
     #region Buy
 
     void BuildStockButtons()
@@ -170,7 +150,7 @@ public class ShopUI : MonoBehaviour
                     $"{item.Crop.cropName} seed. Click a farm plot to plant it.");
                 break;
             case ShopItem.ItemType.Placeable:
-                PlacementController.Instance.BeginPlacement(item.Placeable);
+                PlacementController.Instance.BeginPlacement(item.Placeable, paid: true);
                 TutorialConsole.Log($"Click the grid to place your " +
                     $"{item.Placeable.placeableName}. Press Escape to cancel.");
                 CloseShop();
@@ -242,6 +222,8 @@ public class ShopUI : MonoBehaviour
         }
 
         GameManager.Instance.AddCoins(total);
+        Vector3 screenCenter = Camera.main.ViewportToWorldPoint(new Vector3(0.5f, 0.4f, 10f));
+        FloatingText.Spawn($"+{total} coins", screenCenter, new Color(1f, 0.85f, 0.1f));
         TutorialConsole.Log($"Sold everything for {total} coins.");
         RefreshSellButtons();
     }
