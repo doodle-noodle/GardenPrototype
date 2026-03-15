@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 7361566653032949450}
   - component: {fileID: 1507742622338848551}
   - component: {fileID: 1401761495181619125}
+  - component: {fileID: 6295567361636921761}
   m_Layer: 0
   m_Name: FarmPlot
   m_TagString: Untagged
@@ -125,7 +126,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f8bb63eb2fa46a44985f2a75b0384a56, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FarmPlot
-  availableCrops:
-  - {fileID: 11400000, guid: 67106f1d674fb4443af0a7e9782099fc, type: 2}
-  - {fileID: 11400000, guid: 08f66b793f5e3354b9a27762a71815d9, type: 2}
-  cropVisualRoot: {fileID: 0}
+--- !u!114 &6295567361636921761
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9072538423759121712}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e959bb559e696074ea9baa7c584372d4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FarmPlotVisual

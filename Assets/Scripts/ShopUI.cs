@@ -8,16 +8,23 @@ public class ShopUI : MonoBehaviour
     public static ShopUI Instance;
     public static bool IsOpen { get; private set; }
 
-    [Header("All crops in the game")]
-    public CropData[] allCrops;
-
     private GameObject shopPanel;
-    private Transform seedContainer;
-    private Transform sellContainer;
+    private Transform  stockContainer;
+    private Transform  sellContainer;
     private TextMeshProUGUI noHarvestText;
+    private TextMeshProUGUI refreshTimerText;
     private bool isOpen = false;
 
-    void Awake() => Instance = this;
+    void Awake()
+    {
+        Instance = this;
+        EventBus.OnShopStockRefreshed += OnStockRefreshed;
+    }
+
+    void OnDestroy()
+    {
+        EventBus.OnShopStockRefreshed -= OnStockRefreshed;
+    }
 
     void Start()
     {
@@ -25,52 +32,65 @@ public class ShopUI : MonoBehaviour
         shopPanel.SetActive(false);
     }
 
-    // ── Build the entire shop UI in code ─────────────────────
+    void Update()
+    {
+        if (isOpen && refreshTimerText != null && ShopStock.Instance != null)
+        {
+            float t = ShopStock.Instance.TimeUntilRefresh;
+            refreshTimerText.text = $"Refreshes in: {(int)(t / 60)}:{(t % 60):00}";
+        }
+    }
 
     void BuildShopUI()
     {
         Canvas canvas = FindFirstObjectByType<Canvas>();
+        shopPanel = MakePanel(canvas.transform, new Vector2(440, 580), "ShopPanel");
 
-        // Main panel
-        shopPanel = MakePanel(canvas.transform, new Vector2(400, 500), "ShopPanel");
+        MakeText(shopPanel.transform, "Shop", 22, new Vector2(0, 260), new Vector2(420, 40));
 
-        // Title
-        MakeText(shopPanel.transform, "Shop", 22, new Vector2(0, 210), new Vector2(380, 40));
+        refreshTimerText = MakeText(shopPanel.transform, "", 12,
+            new Vector2(0, 235), new Vector2(420, 24)).GetComponent<TextMeshProUGUI>();
 
-        // Divider label
-        MakeText(shopPanel.transform, "— Buy Seeds —", 14, new Vector2(0, 170), new Vector2(380, 30));
+        MakeText(shopPanel.transform, "— For Sale —", 14,
+            new Vector2(0, 205), new Vector2(420, 28));
 
-        // Seed scroll area
-        GameObject seedScroll = MakeScrollArea(shopPanel.transform, new Vector2(0, 60), new Vector2(380, 200));
-        seedContainer = seedScroll.transform.Find("Content");
+        GameObject stockScroll = MakeScrollArea(shopPanel.transform,
+            new Vector2(0, 80), new Vector2(420, 240));
+        stockContainer = stockScroll.transform.Find("Content");
 
-        // Divider label
-        MakeText(shopPanel.transform, "— Sell Harvest —", 14, new Vector2(0, -90), new Vector2(380, 30));
+        MakeText(shopPanel.transform, "— Sell Harvest —", 14,
+            new Vector2(0, -90), new Vector2(420, 28));
 
-        // Sell scroll area
-        GameObject sellScroll = MakeScrollArea(shopPanel.transform, new Vector2(0, -160), new Vector2(380, 120));
+        GameObject sellScroll = MakeScrollArea(shopPanel.transform,
+            new Vector2(0, -175), new Vector2(420, 130));
         sellContainer = sellScroll.transform.Find("Content");
 
-        // No harvest text
-        GameObject noHarvestObj = MakeText(shopPanel.transform, "Nothing to sell yet.", 13,
-            new Vector2(0, -160), new Vector2(360, 30));
+        var noHarvestObj = MakeText(shopPanel.transform, "Nothing to sell yet.", 13,
+            new Vector2(0, -175), new Vector2(400, 28));
         noHarvestText = noHarvestObj.GetComponent<TextMeshProUGUI>();
 
-        // Close button
-        MakeButton(shopPanel.transform, "Close", new Vector2(0, -225), new Vector2(120, 36),
-            new Color(0.8f, 0.3f, 0.3f), () => CloseShop());
-
-        BuildSeedButtons();
+        MakeButton(shopPanel.transform, "Close", new Vector2(0, -265),
+            new Vector2(120, 36), new Color(0.7f, 0.25f, 0.25f), () => CloseShop());
     }
 
-    // ── Shop logic ────────────────────────────────────────────
+    // ── Show / hide ───────────────────────────────────────────
 
     public void ToggleShop()
     {
         isOpen = !isOpen;
         IsOpen = isOpen;
         shopPanel.SetActive(isOpen);
-        if (isOpen) RefreshSellButtons();
+
+        if (isOpen)
+        {
+            BuildStockButtons();
+            RefreshSellButtons();
+            EventBus.Raise_ShopOpened();
+        }
+        else
+        {
+            EventBus.Raise_ShopClosed();
+        }
     }
 
     public void CloseShop()
@@ -78,61 +98,87 @@ public class ShopUI : MonoBehaviour
         isOpen = false;
         IsOpen = false;
         shopPanel.SetActive(false);
+        EventBus.Raise_ShopClosed();
     }
 
-    void BuildSeedButtons()
+    void OnStockRefreshed()
     {
-        foreach (Transform child in seedContainer) Destroy(child.gameObject);
+        if (isOpen) BuildStockButtons();
+    }
 
-        foreach (var crop in allCrops)
+    // ── Buy ───────────────────────────────────────────────────
+
+    void BuildStockButtons()
+    {
+        foreach (Transform child in stockContainer) Destroy(child.gameObject);
+
+        if (ShopStock.Instance == null) return;
+
+        foreach (var item in ShopStock.Instance.CurrentStock)
         {
-            CropData captured = crop;
-            MakeButton(seedContainer, $"Buy {crop.cropName} seed  —  {crop.seedCost} coins",
-                Vector2.zero, new Vector2(340, 44), new Color(0.25f, 0.6f, 0.3f),
-                () => BuySeed(captured));
+            ShopItem captured = item;
+            MakeButton(stockContainer,
+                $"{item.DisplayName}  —  {item.Price} coins",
+                Vector2.zero, new Vector2(400, 44),
+                new Color(0.2f, 0.5f, 0.25f), () => BuyItem(captured));
         }
     }
 
-    void BuySeed(CropData crop)
+    void BuyItem(ShopItem item)
     {
-        if (!GameManager.Instance.SpendCoins(crop.seedCost)) return;
-        Inventory.Instance.AddSeed(crop);
-        CloseShop();
+        if (!GameManager.Instance.SpendCoins(item.Price)) return;
+
+        switch (item.Type)
+        {
+            case ShopItem.ItemType.Seed:
+                Inventory.Instance.AddSeed(item.Crop);
+                break;
+            case ShopItem.ItemType.Placeable:
+                PlacementController.Instance.BeginPlacement(item.Placeable);
+                CloseShop();
+                break;
+        }
     }
+
+    // ── Sell ──────────────────────────────────────────────────
 
     void RefreshSellButtons()
     {
         foreach (Transform child in sellContainer) Destroy(child.gameObject);
 
-        var harvested = Inventory.Instance.GetAllHarvested();
-        bool hasAnything = false;
+        var groups    = Inventory.Instance.GetGroupedHarvest();
+        bool hasItems = false;
 
-        foreach (var kvp in harvested)
+        foreach (var kvp in groups)
         {
-            if (kvp.Value <= 0) continue;
-            hasAnything = true;
+            if (kvp.Value.Count == 0) continue;
+            hasItems = true;
 
-            CropData captured = kvp.Key;
-            int count = kvp.Value;
-            int total = captured.sellValue * count;
+            var  captured = kvp.Value;
+            var  sample   = kvp.Value[0];
+            int  total    = 0;
+            foreach (var h in captured) total += h.SellValue;
 
-            MakeButton(sellContainer,
-                $"Sell {captured.cropName}  x{count}  —  +{total} coins",
-                Vector2.zero, new Vector2(340, 44), new Color(0.7f, 0.55f, 0.1f),
-                () => SellAll(captured));
+            string label = $"Sell {sample.DisplayName} " +
+                           $"{RankUtility.RankLabel(sample.Rank)} " +
+                           $"x{captured.Count}  —  +{total} coins";
+
+            MakeButton(sellContainer, label, Vector2.zero,
+                new Vector2(400, 44), new Color(0.6f, 0.45f, 0.05f),
+                () => SellGroup(captured));
         }
 
         if (noHarvestText != null)
-            noHarvestText.gameObject.SetActive(!hasAnything);
+            noHarvestText.gameObject.SetActive(!hasItems);
     }
 
-    void SellAll(CropData crop)
+    void SellGroup(List<HarvestedCrop> group)
     {
-        int count = Inventory.Instance.GetHarvestCount(crop);
-        for (int i = 0; i < count; i++)
+        foreach (var crop in new List<HarvestedCrop>(group))
         {
-            Inventory.Instance.UseHarvest(crop);
-            GameManager.Instance.AddCoins(crop.sellValue);
+            GameManager.Instance.AddCoins(crop.SellValue);
+            Inventory.Instance.RemoveHarvest(crop);
+            EventBus.Raise_CropSold(crop);
         }
         RefreshSellButtons();
     }
@@ -141,65 +187,64 @@ public class ShopUI : MonoBehaviour
 
     GameObject MakePanel(Transform parent, Vector2 size, string name)
     {
-        GameObject go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        GameObject go = new GameObject(name, typeof(RectTransform),
+            typeof(CanvasRenderer), typeof(Image));
         go.transform.SetParent(parent, false);
-        RectTransform rt = go.GetComponent<RectTransform>();
+        var rt = go.GetComponent<RectTransform>();
         rt.sizeDelta = size;
         rt.anchoredPosition = Vector2.zero;
-        go.GetComponent<Image>().color = new Color(0.1f, 0.1f, 0.1f, 0.95f);
+        go.GetComponent<Image>().color = new Color(0.08f, 0.08f, 0.08f, 0.96f);
         return go;
     }
 
     GameObject MakeScrollArea(Transform parent, Vector2 pos, Vector2 size)
     {
-        // Viewport
-        GameObject scroll = new GameObject("Scroll", typeof(RectTransform), typeof(CanvasRenderer),
-            typeof(Image), typeof(ScrollRect), typeof(Mask));
+        GameObject scroll = new GameObject("Scroll", typeof(RectTransform),
+            typeof(CanvasRenderer), typeof(Image), typeof(ScrollRect), typeof(Mask));
         scroll.transform.SetParent(parent, false);
-        RectTransform srt = scroll.GetComponent<RectTransform>();
+        var srt = scroll.GetComponent<RectTransform>();
         srt.sizeDelta = size;
         srt.anchoredPosition = pos;
-        scroll.GetComponent<Image>().color = new Color(0.15f, 0.15f, 0.15f, 1f);
+        scroll.GetComponent<Image>().color = new Color(0.12f, 0.12f, 0.12f, 1f);
         scroll.GetComponent<Mask>().showMaskGraphic = true;
 
-        // Content
         GameObject content = new GameObject("Content", typeof(RectTransform));
         content.transform.SetParent(scroll.transform, false);
-        RectTransform crt = content.GetComponent<RectTransform>();
+        var crt = content.GetComponent<RectTransform>();
         crt.anchorMin = new Vector2(0, 1);
         crt.anchorMax = new Vector2(1, 1);
         crt.pivot     = new Vector2(0.5f, 1f);
-        crt.sizeDelta = new Vector2(0, 0);
+        crt.sizeDelta = Vector2.zero;
         crt.anchoredPosition = Vector2.zero;
 
-        VerticalLayoutGroup vlg = content.AddComponent<VerticalLayoutGroup>();
+        var vlg = content.AddComponent<VerticalLayoutGroup>();
         vlg.spacing = 6;
         vlg.padding = new RectOffset(8, 8, 8, 8);
-        vlg.childAlignment = TextAnchor.UpperCenter;
-        vlg.childControlWidth  = true;
-        vlg.childControlHeight = false;
+        vlg.childAlignment       = TextAnchor.UpperCenter;
+        vlg.childControlWidth    = true;
+        vlg.childControlHeight   = false;
         vlg.childForceExpandWidth  = true;
         vlg.childForceExpandHeight = false;
 
-        ContentSizeFitter csf = content.AddComponent<ContentSizeFitter>();
+        var csf = content.AddComponent<ContentSizeFitter>();
         csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-        ScrollRect sr = scroll.GetComponent<ScrollRect>();
-        sr.content   = crt;
-        sr.horizontal = false;
-        sr.vertical   = true;
+        var sr = scroll.GetComponent<ScrollRect>();
+        sr.content           = crt;
+        sr.horizontal        = false;
+        sr.vertical          = true;
         sr.scrollSensitivity = 20f;
 
         return scroll;
     }
 
-    GameObject MakeButton(Transform parent, string label, Vector2 pos, Vector2 size,
-        Color color, UnityEngine.Events.UnityAction action)
+    GameObject MakeButton(Transform parent, string label, Vector2 pos,
+        Vector2 size, Color color, UnityEngine.Events.UnityAction action)
     {
-        GameObject go = new GameObject("Btn_" + label, typeof(RectTransform),
+        GameObject go = new GameObject("Btn", typeof(RectTransform),
             typeof(CanvasRenderer), typeof(Image), typeof(Button));
         go.transform.SetParent(parent, false);
-        RectTransform rt = go.GetComponent<RectTransform>();
+        var rt = go.GetComponent<RectTransform>();
         rt.sizeDelta = size;
         rt.anchoredPosition = pos;
         go.GetComponent<Image>().color = color;
@@ -208,35 +253,38 @@ public class ShopUI : MonoBehaviour
         GameObject txt = new GameObject("Label", typeof(RectTransform),
             typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         txt.transform.SetParent(go.transform, false);
-        RectTransform trt = txt.GetComponent<RectTransform>();
+        var trt = txt.GetComponent<RectTransform>();
         trt.anchorMin = Vector2.zero;
         trt.anchorMax = Vector2.one;
         trt.sizeDelta = Vector2.zero;
         trt.anchoredPosition = Vector2.zero;
 
-        TextMeshProUGUI tmp = txt.GetComponent<TextMeshProUGUI>();
-        tmp.text = label;
-        tmp.fontSize = 13;
+        var tmp = txt.GetComponent<TextMeshProUGUI>();
+        tmp.text      = label;
+        tmp.fontSize  = 12;
         tmp.alignment = TextAlignmentOptions.Center;
-        tmp.color = Color.white;
+        tmp.color     = Color.white;
+        tmp.richText  = true;
 
         return go;
     }
 
-    GameObject MakeText(Transform parent, string content, int fontSize, Vector2 pos, Vector2 size)
+    GameObject MakeText(Transform parent, string content, int fontSize,
+        Vector2 pos, Vector2 size)
     {
-        GameObject go = new GameObject("Text_" + content, typeof(RectTransform),
+        GameObject go = new GameObject("Txt", typeof(RectTransform),
             typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         go.transform.SetParent(parent, false);
-        RectTransform rt = go.GetComponent<RectTransform>();
+        var rt = go.GetComponent<RectTransform>();
         rt.sizeDelta = size;
         rt.anchoredPosition = pos;
 
-        TextMeshProUGUI tmp = go.GetComponent<TextMeshProUGUI>();
-        tmp.text = content;
-        tmp.fontSize = fontSize;
+        var tmp = go.GetComponent<TextMeshProUGUI>();
+        tmp.text      = content;
+        tmp.fontSize  = fontSize;
         tmp.alignment = TextAlignmentOptions.Center;
-        tmp.color = Color.white;
+        tmp.color     = Color.white;
+        tmp.richText  = true;
 
         return go;
     }

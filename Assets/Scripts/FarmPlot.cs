@@ -2,187 +2,107 @@ using UnityEngine;
 
 public class FarmPlot : MonoBehaviour
 {
-    private CropData activeCrop;
-    private int currentStage = -1;
-    private float stageTimer = 0f;
-    private bool isGrown = false;
+    public enum PlotState { Empty, Growing, Ready }
 
-    private GameObject cropSphere;
-    private GameObject ghostSphere;  // preview shown on hover
+    // ── Public state ──────────────────────────────────────────
+    public PlotState State        { get; private set; } = PlotState.Empty;
+    public CropData  ActiveCrop   { get; private set; }
+    public int       CurrentStage { get; private set; } = -1;
+    public float     StageTimer   { get; private set; } = 0f;
+    public bool      IsMutated    { get; private set; } = false;
+    public bool      StateChanged { get; private set; }
 
-    // ── Hover ghost ───────────────────────────────────────────
-
-    void OnMouseEnter()
+    void Update()
     {
-        if (ShopUI.IsOpen) return;
-        if (activeCrop != null) return;  // plot is already in use
-        if (Inventory.Instance.SelectedSeed == null) return;
-        if (Inventory.Instance.GetSeedCount(Inventory.Instance.SelectedSeed) <= 0) return;
+        StateChanged = false;
+        if (State != PlotState.Growing) return;
 
-        ShowGhost();
-    }
+        StageTimer += Time.deltaTime;
+        GrowthStage stage        = ActiveCrop.growthStages[CurrentStage];
+        bool        isFinalStage = CurrentStage == ActiveCrop.growthStages.Length - 1;
 
-    void OnMouseOver()
-    {
-        // If the selected seed changed while hovering, refresh the ghost
-        if (ghostSphere == null && activeCrop == null
-            && Inventory.Instance.SelectedSeed != null
-            && Inventory.Instance.GetSeedCount(Inventory.Instance.SelectedSeed) > 0
-            && !ShopUI.IsOpen)
+        if (!isFinalStage && StageTimer >= stage.duration)
         {
-            ShowGhost();
+            CurrentStage++;
+            StageTimer   = 0f;
+            StateChanged = true;
+        }
+        else if (isFinalStage && StageTimer >= stage.duration)
+        {
+            State        = PlotState.Ready;
+            StateChanged = true;
+            EventBus.Raise_PlotReady(this);
+            Debug.Log($"{ActiveCrop.cropName} is ready to harvest!");
         }
     }
-
-    void OnMouseExit()
-    {
-        HideGhost();
-    }
-
-    void ShowGhost()
-    {
-        HideGhost();
-
-        CropData seed = Inventory.Instance.SelectedSeed;
-        if (seed == null || seed.growthStages.Length == 0) return;
-
-        ghostSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        ghostSphere.transform.SetParent(null);
-        Destroy(ghostSphere.GetComponent<Collider>());
-
-        GrowthStage firstStage = seed.growthStages[0];
-        float s = firstStage.scale;
-        ghostSphere.transform.localScale = new Vector3(s, s, s);
-
-        Vector3 plotTop = transform.position + Vector3.up * (transform.lossyScale.y * 0.5f);
-        ghostSphere.transform.position = plotTop + Vector3.up * (s * 0.5f);
-
-        // Use the same GhostValid material as the farm plot placement preview
-        if (PlacementController.GhostValid != null)
-            ghostSphere.GetComponent<Renderer>().material = PlacementController.GhostValid;
-    }
-
-    void HideGhost()
-    {
-        if (ghostSphere != null)
-        {
-            Destroy(ghostSphere);
-            ghostSphere = null;
-        }
-    }
-
-    // ── Click ─────────────────────────────────────────────────
 
     void OnMouseDown()
     {
         if (ShopUI.IsOpen) return;
 
-        if (activeCrop == null)
+        switch (State)
         {
-            if (TryPlant())
-                HideGhost();  // ghost becomes the real plant
-        }
-        else if (isGrown)
-        {
-            Harvest();
-        }
-        else
-        {
-            float remaining = activeCrop.growthStages[currentStage].duration - stageTimer;
-            Debug.Log($"{activeCrop.cropName} — stage {currentStage + 1}/{activeCrop.growthStages.Length}, {remaining:F1}s left");
+            case PlotState.Empty:   TryPlant(); break;
+            case PlotState.Ready:   Harvest();  break;
+            case PlotState.Growing:
+                float remaining = ActiveCrop.growthStages[CurrentStage].duration - StageTimer;
+                Debug.Log($"{ActiveCrop.cropName} — stage {CurrentStage + 1}/" +
+                          $"{ActiveCrop.growthStages.Length}, {remaining:F1}s left");
+                break;
         }
     }
 
-    // ── Planting ──────────────────────────────────────────────
-
-    bool TryPlant()
+    void TryPlant()
     {
         CropData selected = Inventory.Instance.SelectedSeed;
+        if (selected == null) { Debug.Log("No seed selected."); return; }
+        if (!Inventory.Instance.UseSeed(selected)) return;
 
-        if (selected == null)
-        {
-            Debug.Log("No seed selected. Buy seeds from the shop first.");
-            return false;
-        }
+        ActiveCrop   = selected;
+        CurrentStage = 0;
+        StageTimer   = 0f;
+        IsMutated    = false;
+        State        = PlotState.Growing;
+        StateChanged = true;
 
-        if (!Inventory.Instance.UseSeed(selected))
-        {
-            Debug.Log($"No {selected.cropName} seeds left. Buy more from the shop.");
-            return false;
-        }
-
-        activeCrop = selected;
-        currentStage = 0;
-        stageTimer = 0f;
-        isGrown = false;
-        UpdateVisual();
-        Debug.Log($"Planted {activeCrop.cropName}!");
-        return true;
+        EventBus.Raise_PlotPlanted(this);
+        Debug.Log($"Planted {ActiveCrop.cropName}!");
     }
-
-    // ── Growing ───────────────────────────────────────────────
-
-    void Update()
-    {
-        if (activeCrop == null || isGrown) return;
-
-        stageTimer += Time.deltaTime;
-        GrowthStage stage = activeCrop.growthStages[currentStage];
-        bool isFinalStage = currentStage == activeCrop.growthStages.Length - 1;
-
-        if (!isFinalStage && stageTimer >= stage.duration)
-        {
-            currentStage++;
-            stageTimer = 0f;
-            UpdateVisual();
-        }
-        else if (isFinalStage && !isGrown)
-        {
-            isGrown = true;
-            UpdateVisual();
-            Debug.Log($"{activeCrop.cropName} is ready to harvest!");
-        }
-    }
-
-    // ── Harvest ───────────────────────────────────────────────
 
     void Harvest()
     {
-        Inventory.Instance.AddHarvest(activeCrop);
-        Debug.Log($"Harvested {activeCrop.cropName}! Go sell it at the shop.");
-
-        activeCrop = null;
-        currentStage = -1;
-        isGrown = false;
-
-        if (cropSphere != null) { Destroy(cropSphere); cropSphere = null; }
-    }
-
-    // ── Visuals ───────────────────────────────────────────────
-
-    void UpdateVisual()
-    {
-        if (cropSphere == null)
+        // Roll for mutation
+        bool mutated = Random.value < ActiveCrop.mutationChance;
+        if (mutated)
         {
-            cropSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            cropSphere.transform.SetParent(null);
-            Destroy(cropSphere.GetComponent<Collider>());
+            IsMutated = true;
+            EventBus.Raise_MutationOccurred(this);
+            Debug.Log($"Mutation! {ActiveCrop.cropName} has mutated!");
         }
 
-        GrowthStage stage = activeCrop.growthStages[currentStage];
-        float s = stage.scale;
-        cropSphere.transform.localScale = new Vector3(s, s, s);
+        // Roll for rank
+        Rank rank = RankUtility.RollRank();
 
-        Vector3 plotTop = transform.position + Vector3.up * (transform.lossyScale.y * 0.5f);
-        cropSphere.transform.position = plotTop + Vector3.up * (s * 0.5f);
+        // If mutatesInto is assigned, switch to that crop type
+        CropData finalCrop = (mutated && ActiveCrop.mutatesInto != null)
+            ? ActiveCrop.mutatesInto
+            : ActiveCrop;
 
-        cropSphere.GetComponent<Renderer>().material.color = stage.stageColor;
+        var harvested = new HarvestedCrop(finalCrop, rank, mutated);
+        Inventory.Instance.AddHarvest(harvested);
+
+        Debug.Log($"Harvested {RankUtility.RankLabel(rank)} {harvested.DisplayName} " +
+                  $"(worth {harvested.SellValue} coins)");
+
+        ActiveCrop   = null;
+        CurrentStage = -1;
+        StageTimer   = 0f;
+        IsMutated    = false;
+        State        = PlotState.Empty;
+        StateChanged = true;
     }
 
-    void OnDestroy()
-    {
-        // Clean up floating spheres if the plot is ever destroyed
-        if (cropSphere != null) Destroy(cropSphere);
-        if (ghostSphere != null) Destroy(ghostSphere);
-    }
+    void OnMouseEnter() => GetComponent<FarmPlotVisual>()?.OnHoverEnter();
+    void OnMouseOver()  => GetComponent<FarmPlotVisual>()?.OnHoverStay();
+    void OnMouseExit()  => GetComponent<FarmPlotVisual>()?.OnHoverExit();
 }

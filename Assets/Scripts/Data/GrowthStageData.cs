@@ -8,4 +8,6 @@ public class GrowthStage
     public Color stageColor;        // color of the visual sphere
     [Range(0.1f, 1f)]
     public float scale;             // how big the visual is at this stage
+
+    public GameObject visualPrefab;
 }

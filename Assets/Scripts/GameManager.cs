@@ -10,14 +10,13 @@ public class GameManager : MonoBehaviour
 
     [Header("UI")]
     public TextMeshProUGUI coinText;
-    public GameObject placementUI;   // panel shown when placing
 
     private int coins;
 
     void Awake()
     {
         Instance = this;
-        coins = startingCoins;
+        coins    = startingCoins;
     }
 
     void Start() => UpdateUI();
@@ -27,6 +26,7 @@ public class GameManager : MonoBehaviour
         if (coins < amount) { Debug.Log("Not enough coins!"); return false; }
         coins -= amount;
         UpdateUI();
+        EventBus.Raise_CoinsChanged(coins);
         return true;
     }
 
@@ -34,6 +34,7 @@ public class GameManager : MonoBehaviour
     {
         coins += amount;
         UpdateUI();
+        EventBus.Raise_CoinsChanged(coins);
     }
 
     void UpdateUI()
