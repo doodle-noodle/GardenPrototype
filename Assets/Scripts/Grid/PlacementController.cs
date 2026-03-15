@@ -25,6 +25,8 @@ public class PlacementController : MonoBehaviour
     private int           framesToSkip = 0;
     private Camera        mainCamera;
 
+    public bool IsPlacing => isPlacing;
+
     // ── Setup ─────────────────────────────────────────────────
 
     void Awake()
