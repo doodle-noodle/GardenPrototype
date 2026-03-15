@@ -12,6 +12,8 @@ public class FarmPlot : MonoBehaviour
     public bool      IsMutated    { get; private set; } = false;
     public bool      StateChanged { get; private set; }
 
+    // ── Growing ───────────────────────────────────────────────
+
     void Update()
     {
         StateChanged = false;
@@ -32,9 +34,11 @@ public class FarmPlot : MonoBehaviour
             State        = PlotState.Ready;
             StateChanged = true;
             EventBus.Raise_PlotReady(this);
-            Debug.Log($"{ActiveCrop.cropName} is ready to harvest!");
+            TutorialConsole.Log($"{ActiveCrop.cropName} is ready to harvest!");
         }
     }
+
+    // ── Input ─────────────────────────────────────────────────
 
     void OnMouseDown()
     {
@@ -46,17 +50,33 @@ public class FarmPlot : MonoBehaviour
             case PlotState.Ready:   Harvest();  break;
             case PlotState.Growing:
                 float remaining = ActiveCrop.growthStages[CurrentStage].duration - StageTimer;
-                Debug.Log($"{ActiveCrop.cropName} — stage {CurrentStage + 1}/" +
-                          $"{ActiveCrop.growthStages.Length}, {remaining:F1}s left");
+                TutorialConsole.Log($"{ActiveCrop.cropName} — stage {CurrentStage + 1}/" +
+                    $"{ActiveCrop.growthStages.Length}, ready in {remaining:F1}s.");
                 break;
         }
     }
 
+    void OnMouseEnter() => GetComponent<FarmPlotVisual>()?.OnHoverEnter();
+    void OnMouseOver()  => GetComponent<FarmPlotVisual>()?.OnHoverStay();
+    void OnMouseExit()  => GetComponent<FarmPlotVisual>()?.OnHoverExit();
+
+    // ── Planting ──────────────────────────────────────────────
+
     void TryPlant()
     {
         CropData selected = Inventory.Instance.SelectedSeed;
-        if (selected == null) { Debug.Log("No seed selected."); return; }
-        if (!Inventory.Instance.UseSeed(selected)) return;
+
+        if (selected == null)
+        {
+            TutorialConsole.Warn("Buy a seed from the shop first in order to plant it.");
+            return;
+        }
+
+        if (!Inventory.Instance.UseSeed(selected))
+        {
+            TutorialConsole.Warn($"No {selected.cropName} seeds left. Buy more from the shop.");
+            return;
+        }
 
         ActiveCrop   = selected;
         CurrentStage = 0;
@@ -65,9 +85,11 @@ public class FarmPlot : MonoBehaviour
         State        = PlotState.Growing;
         StateChanged = true;
 
+        TutorialConsole.Log($"Planted {ActiveCrop.cropName}!");
         EventBus.Raise_PlotPlanted(this);
-        Debug.Log($"Planted {ActiveCrop.cropName}!");
     }
+
+    // ── Harvesting ────────────────────────────────────────────
 
     void Harvest()
     {
@@ -77,13 +99,13 @@ public class FarmPlot : MonoBehaviour
         {
             IsMutated = true;
             EventBus.Raise_MutationOccurred(this);
-            Debug.Log($"Mutation! {ActiveCrop.cropName} has mutated!");
+            TutorialConsole.Log($"<color=#CC88FF>Mutation! {ActiveCrop.cropName} has mutated!</color>");
         }
 
         // Roll for rank
         Rank rank = RankUtility.RollRank();
 
-        // If mutatesInto is assigned, switch to that crop type
+        // Switch crop type if mutatesInto is assigned
         CropData finalCrop = (mutated && ActiveCrop.mutatesInto != null)
             ? ActiveCrop.mutatesInto
             : ActiveCrop;
@@ -91,8 +113,8 @@ public class FarmPlot : MonoBehaviour
         var harvested = new HarvestedCrop(finalCrop, rank, mutated);
         Inventory.Instance.AddHarvest(harvested);
 
-        Debug.Log($"Harvested {RankUtility.RankLabel(rank)} {harvested.DisplayName} " +
-                  $"(worth {harvested.SellValue} coins)");
+        TutorialConsole.Log($"Harvested {RankUtility.RankLabel(rank)} " +
+            $"{harvested.DisplayName} — worth {harvested.SellValue} coins.");
 
         ActiveCrop   = null;
         CurrentStage = -1;
@@ -101,8 +123,4 @@ public class FarmPlot : MonoBehaviour
         State        = PlotState.Empty;
         StateChanged = true;
     }
-
-    void OnMouseEnter() => GetComponent<FarmPlotVisual>()?.OnHoverEnter();
-    void OnMouseOver()  => GetComponent<FarmPlotVisual>()?.OnHoverStay();
-    void OnMouseExit()  => GetComponent<FarmPlotVisual>()?.OnHoverExit();
 }

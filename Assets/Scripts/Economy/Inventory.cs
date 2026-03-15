@@ -44,8 +44,13 @@ public class Inventory : MonoBehaviour
 
     public void SelectSeed(CropData crop)
     {
-        if (GetSeedCount(crop) <= 0) return;
+        if (GetSeedCount(crop) <= 0)
+        {
+            TutorialConsole.Warn($"No {crop.cropName} seeds in inventory.");
+            return;
+        }
         SelectedSeed = crop;
+        TutorialConsole.Log($"Selected: {crop.cropName} seed.");
     }
 
     public int GetSeedCount(CropData crop) =>

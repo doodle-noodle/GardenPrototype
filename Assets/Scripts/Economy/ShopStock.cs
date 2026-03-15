@@ -6,23 +6,19 @@ public class ShopStock : MonoBehaviour
     public static ShopStock Instance;
 
     [Header("Stock settings")]
-    public int    itemsPerRefresh   = 6;
-    public float  refreshInterval   = 300f;  // 5 minutes
+    public int   itemsPerRefresh = 6;
+    public float refreshInterval = 300f;
 
     [Header("All possible items")]
     public CropData[]      allCrops;
     public PlaceableData[] allPlaceables;
 
-    public List<ShopItem>  CurrentStock { get; private set; } = new();
+    public List<ShopItem> CurrentStock { get; private set; } = new();
 
     private float refreshTimer = 0f;
 
     void Awake() => Instance = this;
-
-    void Start()
-    {
-        Refresh();
-    }
+    void Start()  => Refresh();
 
     void Update()
     {
@@ -40,16 +36,16 @@ public class ShopStock : MonoBehaviour
     {
         CurrentStock.Clear();
 
-        // Build a pool of all possible items
         var pool = new List<ShopItem>();
 
+        // Use each item's fixed rarity instead of rolling randomly
         foreach (var crop in allCrops)
-            pool.Add(ShopItem.MakeSeed(crop, RankUtility.RollRank()));
+            pool.Add(ShopItem.MakeSeed(crop, crop.rarity));
 
         foreach (var placeable in allPlaceables)
-            pool.Add(ShopItem.MakePlaceable(placeable, RankUtility.RollRank()));
+            pool.Add(ShopItem.MakePlaceable(placeable, placeable.rarity));
 
-        // Shuffle and pick itemsPerRefresh items
+        // Shuffle
         for (int i = pool.Count - 1; i > 0; i--)
         {
             int j = Random.Range(0, i + 1);
@@ -61,6 +57,5 @@ public class ShopStock : MonoBehaviour
             CurrentStock.Add(pool[i]);
 
         EventBus.Raise_ShopStockRefreshed();
-        Debug.Log($"Shop refreshed with {CurrentStock.Count} items.");
     }
 }

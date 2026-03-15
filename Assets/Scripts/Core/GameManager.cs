@@ -23,7 +23,11 @@ public class GameManager : MonoBehaviour
 
     public bool SpendCoins(int amount)
     {
-        if (coins < amount) { Debug.Log("Not enough coins!"); return false; }
+        if (coins < amount)
+        {
+            TutorialConsole.Error("Insufficient funds.");
+            return false;
+        }
         coins -= amount;
         UpdateUI();
         EventBus.Raise_CoinsChanged(coins);

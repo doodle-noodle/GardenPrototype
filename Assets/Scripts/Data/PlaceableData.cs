@@ -6,6 +6,7 @@ public class PlaceableData : ScriptableObject
     public string placeableName;
     public GameObject prefab;
     public int unlockCost;
-    public int gridWidth  = 1;   // how many grid cells wide
-    public int gridHeight = 1;   // how many grid cells deep
+    public Rarity rarity = Rarity.Common;  // set per placeable in Inspector
+    public int gridWidth  = 1;
+    public int gridHeight = 1;
 }

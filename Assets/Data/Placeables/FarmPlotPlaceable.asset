@@ -12,8 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 75096ee630c4ecb4e92dd7549d93a666, type: 3}
   m_Name: FarmPlotPlaceable
   m_EditorClassIdentifier: Assembly-CSharp::PlaceableData
-  placeableName: 
+  placeableName: Farm Plot
   prefab: {fileID: 9072538423759121712, guid: e57c28d5ada525e40838e7a1483b8882, type: 3}
   unlockCost: 20
+  rarity: 0
   gridWidth: 1
   gridHeight: 1

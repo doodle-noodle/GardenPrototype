@@ -10,14 +10,17 @@ public class CropData : ScriptableObject
     public int seedCost;
     public int sellValue;
 
+    [Header("Shop")]
+    public Rarity rarity = Rarity.Common;  // set per crop in Inspector
+
     [Header("Growth")]
     public GrowthStage[] growthStages;
 
     [Header("Mutation")]
     [Range(0f, 1f)]
-    public float mutationChance = 0.05f;  // 5% chance by default
-    public CropData mutatesInto;           // leave null = same crop, just mutated flag
+    public float mutationChance = 0.05f;
+    public CropData mutatesInto;
 
     [Header("Dating")]
-    public DialogueData dialogue;          // assign when the crop has dating content
+    public DialogueData dialogue;
 }

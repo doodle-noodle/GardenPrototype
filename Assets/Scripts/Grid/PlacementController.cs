@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.EventSystems;
 
 public class PlacementController : MonoBehaviour
@@ -9,35 +9,45 @@ public class PlacementController : MonoBehaviour
     public Material ghostValidMaterial;
     public Material ghostInvalidMaterial;
 
+    [Header("Hierarchy organisation")]
+    public Transform placedObjectsParent;
+
+    // Static accessors so FarmPlotVisual can grab the ghost materials
     public static Material GhostValid   => Instance.ghostValidMaterial;
     public static Material GhostInvalid => Instance.ghostInvalidMaterial;
 
-    private LayerMask groundLayer;
+    private LayerMask    groundLayer;
     private PlaceableData currentData;
-    private GameObject ghostObject;
-    private bool isPlacing = false;
-    private int ghostX, ghostZ;
-    private bool placementValid;
-    private int framesToSkip = 0;  // prevents same click that opens placement from confirming it
+    private GameObject   ghostObject;
+    private bool         isPlacing    = false;
+    private int          ghostX, ghostZ;
+    private bool         placementValid;
+    private int          framesToSkip = 0;
+
+    // ── Setup ─────────────────────────────────────────────────
 
     void Awake()
     {
-        Instance = this;
+        Instance   = this;
         groundLayer = LayerMask.GetMask("Ground");
     }
+
+    // ── Public API ────────────────────────────────────────────
 
     public void BeginPlacement(PlaceableData data)
     {
         if (isPlacing) CancelPlacement();
-        currentData = data;
-        isPlacing = true;
-        framesToSkip = 2;  // skip the next 2 frames of input
+
+        currentData  = data;
+        isPlacing    = true;
+        framesToSkip = 2;
 
         ghostObject = Instantiate(data.prefab);
         SetGhostMaterials(ghostValidMaterial);
 
         foreach (var mb in ghostObject.GetComponentsInChildren<MonoBehaviour>())
             mb.enabled = false;
+
         foreach (var col in ghostObject.GetComponentsInChildren<Collider>())
             col.enabled = false;
     }
@@ -45,9 +55,11 @@ public class PlacementController : MonoBehaviour
     public void CancelPlacement()
     {
         if (ghostObject) Destroy(ghostObject);
-        isPlacing = false;
+        isPlacing   = false;
         currentData = null;
     }
+
+    // ── Update ────────────────────────────────────────────────
 
     void Update()
     {
@@ -60,14 +72,15 @@ public class PlacementController : MonoBehaviour
         if (ghostObject) ghostObject.SetActive(true);
         if (!isPlacing) return;
 
-        // Count down the grace period frames
+        // Wait a couple of frames so the click that opened placement
+        // doesn't immediately confirm it
         if (framesToSkip > 0)
         {
             framesToSkip--;
             return;
         }
 
-        // Don't process clicks that are over a UI element
+        // Don't process clicks that land on a UI element
         if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
             return;
 
@@ -79,8 +92,10 @@ public class PlacementController : MonoBehaviour
             ghostObject.transform.position = snapped;
 
             GridManager.Instance.GetCellCoords(snapped, out ghostX, out ghostZ);
-            placementValid = GridManager.Instance.CanPlace(ghostX, ghostZ,
-                currentData.gridWidth, currentData.gridHeight);
+            placementValid = GridManager.Instance.CanPlace(
+                ghostX, ghostZ,
+                currentData.gridWidth,
+                currentData.gridHeight);
 
             SetGhostMaterials(placementValid ? ghostValidMaterial : ghostInvalidMaterial);
         }
@@ -89,8 +104,13 @@ public class PlacementController : MonoBehaviour
             ConfirmPlacement();
 
         if (Input.GetKeyDown(KeyCode.Escape))
+        {
             CancelPlacement();
+            TutorialConsole.Log("Placement cancelled.");
+        }
     }
+
+    // ── Placement ─────────────────────────────────────────────
 
     void ConfirmPlacement()
     {
@@ -99,16 +119,27 @@ public class PlacementController : MonoBehaviour
         GameObject placed = Instantiate(currentData.prefab,
             ghostObject.transform.position, Quaternion.identity);
 
-        GridManager.Instance.SetOccupied(ghostX, ghostZ,
-            currentData.gridWidth, currentData.gridHeight, placed);
+        // Keep the Hierarchy tidy by parenting under the designated group
+        if (placedObjectsParent != null)
+            placed.transform.SetParent(placedObjectsParent);
+
+        GridManager.Instance.SetOccupied(
+            ghostX, ghostZ,
+            currentData.gridWidth,
+            currentData.gridHeight,
+            placed);
 
         foreach (var mb in placed.GetComponentsInChildren<MonoBehaviour>())
             mb.enabled = true;
 
+        TutorialConsole.Log($"{currentData.placeableName} placed!");
+
         Destroy(ghostObject);
-        isPlacing = false;
+        isPlacing   = false;
         currentData = null;
     }
+
+    // ── Helpers ───────────────────────────────────────────────
 
     void SetGhostMaterials(Material mat)
     {
