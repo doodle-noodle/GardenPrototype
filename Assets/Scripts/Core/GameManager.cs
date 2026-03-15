@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using TMPro;
 
 public class GameManager : MonoBehaviour
@@ -17,11 +17,27 @@ public class GameManager : MonoBehaviour
     {
         Instance = this;
         coins    = startingCoins;
+
+        // Auto-find coinText if not assigned in Inspector
+        if (coinText == null)
+        {
+            foreach (var tmp in FindObjectsByType<TextMeshProUGUI>(FindObjectsSortMode.None))
+            {
+                if (tmp.gameObject.name.ToLower().Contains("coin"))
+                {
+                    coinText = tmp;
+                    break;
+                }
+            }
+        }
+
+        if (coinText == null)
+            Debug.LogWarning("GameManager: coinText not found. Assign it in the Inspector.");
     }
 
     void Start() => UpdateUI();
 
-    public bool CanAfford(int amount) => coins >= amount;
+    // ── Economy ───────────────────────────────────────────────
 
     public bool SpendCoins(int amount)
     {
@@ -42,33 +58,14 @@ public class GameManager : MonoBehaviour
         UpdateUI();
         EventBus.Raise_CoinsChanged(coins);
     }
-    private int     displayedCoins = 0;
-    private int     targetCoins    = 0;
-    private float   coinAnimTimer  = 0f;
-    private const float CoinAnimDuration = 0.4f;
+
+    public bool CanAfford(int amount) => coins >= amount;
+
+    // ── UI ────────────────────────────────────────────────────
 
     void UpdateUI()
     {
-        targetCoins = coins;
-        coinAnimTimer = 0f;
-    }
-
-    void Update()
-    {
-        if (displayedCoins != targetCoins)
-        {
-            coinAnimTimer += Time.deltaTime;
-            float t = Mathf.Clamp01(coinAnimTimer / CoinAnimDuration);
-            displayedCoins = (int)Mathf.Lerp(displayedCoins, targetCoins, t);
-
-            if (coinText) coinText.text = $"Coins: {displayedCoins}";
-
-            // Snap when close enough
-            if (Mathf.Abs(displayedCoins - targetCoins) <= 1)
-            {
-                displayedCoins = targetCoins;
-                if (coinText) coinText.text = $"Coins: {displayedCoins}";
-            }
-        }
+        if (coinText != null)
+            coinText.text = $"Coins: {coins}";
     }
 }
