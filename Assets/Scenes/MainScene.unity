@@ -1738,9 +1738,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1b959e0c11d15954c88029f8c0234af1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShopUI
-  allCrops:
-  - {fileID: 11400000, guid: 67106f1d674fb4443af0a7e9782099fc, type: 2}
-  - {fileID: 11400000, guid: 08f66b793f5e3354b9a27762a71815d9, type: 2}
 --- !u!4 &1234131231
 Transform:
   m_ObjectHideFlags: 0
@@ -2064,6 +2061,57 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1800789651
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1800789653}
+  - component: {fileID: 1800789652}
+  m_Layer: 0
+  m_Name: ShopStock
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1800789652
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1800789651}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bda28e6f029437143bb78ece24b1b438, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShopStock
+  itemsPerRefresh: 6
+  refreshInterval: 300
+  allCrops:
+  - {fileID: 11400000, guid: 67106f1d674fb4443af0a7e9782099fc, type: 2}
+  - {fileID: 11400000, guid: 08f66b793f5e3354b9a27762a71815d9, type: 2}
+  allPlaceables:
+  - {fileID: 11400000, guid: 21050113fe85bd540bf8dc9754645290, type: 2}
+--- !u!4 &1800789653
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1800789651}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 4.7393, y: -0, z: 1.73812}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1893654968
 GameObject:
   m_ObjectHideFlags: 0
@@ -2297,7 +2345,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GameManager
   startingCoins: 50
   coinText: {fileID: 1359335661}
-  placementUI: {fileID: 0}
 --- !u!4 &2017363456
 Transform:
   m_ObjectHideFlags: 0
@@ -2343,7 +2390,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GameManager
   startingCoins: 50
   coinText: {fileID: 0}
-  placementUI: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -2362,3 +2408,4 @@ SceneRoots:
   - {fileID: 1455920293}
   - {fileID: 326774716}
   - {fileID: 1893654970}
+  - {fileID: 1800789653}
