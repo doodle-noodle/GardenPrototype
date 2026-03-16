@@ -1009,6 +1009,50 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1452750894}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1008323290
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1008323291}
+  - component: {fileID: 1008323292}
+  m_Layer: 0
+  m_Name: ToolUser
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1008323291
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1008323290}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1990266668}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1008323292
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1008323290}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d81f7ca48e372ce47a3d6c28ae43d066, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ToolUser
 --- !u!1 &1016496800
 GameObject:
   m_ObjectHideFlags: 0
@@ -1694,6 +1738,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 67106f1d674fb4443af0a7e9782099fc, type: 2}
   - {fileID: 11400000, guid: 08f66b793f5e3354b9a27762a71815d9, type: 2}
   - {fileID: 11400000, guid: 21050113fe85bd540bf8dc9754645290, type: 2}
+  - {fileID: 11400000, guid: ff76b11e05b6f1d4dbb76867ae18a95e, type: 2}
 --- !u!4 &1800789653
 Transform:
   m_ObjectHideFlags: 0
@@ -1858,6 +1903,7 @@ Transform:
   - {fileID: 1016496802}
   - {fileID: 78216171}
   - {fileID: 1403890287}
+  - {fileID: 1008323291}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2011727942

@@ -18,10 +18,10 @@ public class InventoryHotbar : MonoBehaviour
     // ── Slot sub-elements ─────────────────────────────────────
     private struct SlotElements
     {
-        public Image            Background;
-        public TextMeshProUGUI  MainLabel;
-        public TextMeshProUGUI  TypeLabel;
-        public Button           Btn;
+        public Image           Background;
+        public TextMeshProUGUI MainLabel;
+        public TextMeshProUGUI TypeLabel;
+        public Button          Btn;
     }
 
     private SlotElements[] slotElements;
@@ -31,6 +31,8 @@ public class InventoryHotbar : MonoBehaviour
     private System.Action<CropData>      _onSeedUsed;
     private System.Action<HarvestedCrop> _onCropHarvested;
     private System.Action<HarvestedCrop> _onCropSold;
+    private System.Action<ToolData>      _onToolAdded;
+    private System.Action<ToolData>      _onToolUsed;
     private System.Action                _onShopClosed;
 
     // ── Lifecycle ─────────────────────────────────────────────
@@ -43,12 +45,16 @@ public class InventoryHotbar : MonoBehaviour
         _onSeedUsed      = _ => Refresh();
         _onCropHarvested = _ => Refresh();
         _onCropSold      = _ => Refresh();
+        _onToolAdded     = _ => Refresh();
+        _onToolUsed      = _ => Refresh();
         _onShopClosed    = Refresh;
 
         EventBus.OnSeedAdded     += _onSeedAdded;
         EventBus.OnSeedUsed      += _onSeedUsed;
         EventBus.OnCropHarvested += _onCropHarvested;
         EventBus.OnCropSold      += _onCropSold;
+        EventBus.OnToolAdded     += _onToolAdded;
+        EventBus.OnToolUsed      += _onToolUsed;
         EventBus.OnShopClosed    += _onShopClosed;
     }
 
@@ -58,6 +64,8 @@ public class InventoryHotbar : MonoBehaviour
         EventBus.OnSeedUsed      -= _onSeedUsed;
         EventBus.OnCropHarvested -= _onCropHarvested;
         EventBus.OnCropSold      -= _onCropSold;
+        EventBus.OnToolAdded     -= _onToolAdded;
+        EventBus.OnToolUsed      -= _onToolUsed;
         EventBus.OnShopClosed    -= _onShopClosed;
     }
 
@@ -156,8 +164,12 @@ public class InventoryHotbar : MonoBehaviour
                 SetSeedSlot(el, slot, Inventory.Instance.SelectedSeed == slot.Crop);
             else if (slot.Type == InventoryItemType.Harvest)
                 SetHarvestSlot(el, slot);
+            else if (slot.Type == InventoryItemType.Tool)
+                SetToolSlot(el, slot);
         }
     }
+
+    // ── Slot setters ──────────────────────────────────────────
 
     void SetEmptySlot(SlotElements el, int index)
     {
@@ -192,6 +204,23 @@ public class InventoryHotbar : MonoBehaviour
         el.TypeLabel.color  = UIColors.TagHarvest;
     }
 
+    void SetToolSlot(SlotElements el, InventorySlot slot)
+    {
+        bool isSelected     = Inventory.Instance.SelectedSlot == slot;
+        el.Background.color = isSelected ? UIColors.SlotSelected : slot.Tool.toolColor;
+        el.MainLabel.text   = $"{slot.Tool.toolName}\nx{slot.ToolCount}";
+        el.MainLabel.color  = UIColors.TextPrimary;
+        el.TypeLabel.text   = "TOOL";
+        el.TypeLabel.color  = UIColors.TextPrimary;
+
+        ToolData captured = slot.Tool;
+        el.Btn.onClick.AddListener(() =>
+        {
+            Inventory.Instance.SelectTool(captured);
+            Refresh();
+        });
+    }
+
     // ── Number keys ───────────────────────────────────────────
 
     void HandleNumberKeys()
@@ -199,13 +228,8 @@ public class InventoryHotbar : MonoBehaviour
         for (int i = 0; i < Inventory.MaxSlots && i < 9; i++)
         {
             if (!Input.GetKeyDown(KeyCode.Alpha1 + i)) continue;
-
-            InventorySlot slot = Inventory.Instance.Slots[i];
-            if (slot.Type == InventoryItemType.Seed)
-            {
-                Inventory.Instance.SelectSeed(slot.Crop);
-                Refresh();
-            }
+            Inventory.Instance.SelectSlot(i);
+            Refresh();
         }
     }
 

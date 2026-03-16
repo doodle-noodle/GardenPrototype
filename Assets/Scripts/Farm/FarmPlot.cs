@@ -4,7 +4,6 @@ public class FarmPlot : MonoBehaviour
 {
     public enum PlotState { Empty, Growing, Ready }
 
-    // ── Public state ──────────────────────────────────────────
     public PlotState State        { get; private set; } = PlotState.Empty;
     public CropData  ActiveCrop   { get; private set; }
     public int       CurrentStage { get; private set; } = -1;
@@ -12,12 +11,28 @@ public class FarmPlot : MonoBehaviour
     public bool      IsMutated    { get; private set; } = false;
     public bool      StateChanged { get; private set; }
 
+    // Stored by GridManager when this plot is placed
+    public int GridX { get; set; }
+    public int GridZ { get; set; }
+
     // ── Growing ───────────────────────────────────────────────
 
     void Update()
     {
         StateChanged = false;
         if (State != PlotState.Growing) return;
+
+        if (ActiveCrop == null || ActiveCrop.growthStages == null ||
+            CurrentStage >= ActiveCrop.growthStages.Length)
+        {
+            Debug.LogWarning($"FarmPlot: invalid crop state on {gameObject.name}. Resetting.");
+            State        = PlotState.Empty;
+            ActiveCrop   = null;
+            CurrentStage = -1;
+            StageTimer   = 0f;
+            StateChanged = true;
+            return;
+        }
 
         StageTimer += Time.deltaTime;
 
@@ -44,6 +59,9 @@ public class FarmPlot : MonoBehaviour
     void OnMouseDown()
     {
         if (ShopUI.IsOpen) return;
+
+        // If a tool is selected, let ToolUser handle the click
+        if (Inventory.Instance.SelectedSlot?.Type == InventoryItemType.Tool) return;
 
         switch (State)
         {
@@ -95,7 +113,6 @@ public class FarmPlot : MonoBehaviour
 
     void Harvest()
     {
-        // All harvest outcome logic lives in HarvestResolver
         var result = HarvestResolver.Resolve(ActiveCrop);
 
         if (result.IsMutated)
@@ -123,5 +140,20 @@ public class FarmPlot : MonoBehaviour
         IsMutated    = false;
         State        = PlotState.Empty;
         StateChanged = true;
+    }
+
+    // ── Removal by shovel ─────────────────────────────────────
+
+    public void RemovePlot()
+    {
+        // Free the grid cells this plot occupied
+        GridManager.Instance.ClearCells(GridX, GridZ, 1, 1);
+
+        EventBus.Raise_PlotRemoved(this);
+
+        // Clean up the visual component first
+        GetComponent<FarmPlotVisual>()?.ForceCleanup();
+
+        Destroy(gameObject);
     }
 }

@@ -268,4 +268,12 @@ public class FarmPlotVisual : MonoBehaviour
         if (ghostObject != null) Destroy(ghostObject);
         if (timerLabel  != null) Destroy(timerLabel);
     }
+
+    // Called by FarmPlot.RemovePlot before the GameObject is destroyed
+    public void ForceCleanup()
+    {
+        ClearCropVisual();
+        HideGhost();
+        HideTimerLabel();
+    }
 }

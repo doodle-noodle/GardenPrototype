@@ -22,7 +22,7 @@ public class PlacementController : MonoBehaviour
     private bool          costAlreadyPaid = false;
     private int           ghostX, ghostZ;
     private bool          placementValid;
-    private int           framesToSkip = 0;
+    private int           framesToSkip    = 0;
     private Camera        mainCamera;
 
     public bool IsPlacing => isPlacing;
@@ -38,7 +38,6 @@ public class PlacementController : MonoBehaviour
 
     // ── Public API ────────────────────────────────────────────
 
-    // Called from the shop — cost already deducted at purchase
     public void BeginPlacement(PlaceableData data, bool paid = false)
     {
         if (isPlacing) CancelPlacement();
@@ -109,7 +108,6 @@ public class PlacementController : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.Escape))
         {
-            // Refund if the player cancels after paying in the shop
             if (costAlreadyPaid)
             {
                 GameManager.Instance.AddCoins(currentData.unlockCost);
@@ -127,7 +125,6 @@ public class PlacementController : MonoBehaviour
 
     void ConfirmPlacement()
     {
-        // Only charge if the cost wasn't already paid at the shop
         if (!costAlreadyPaid)
         {
             if (!GameManager.Instance.SpendCoins(currentData.unlockCost)) return;
@@ -145,6 +142,14 @@ public class PlacementController : MonoBehaviour
             currentData.gridHeight,
             placed);
 
+        // Store grid coords on the plot so it can free them on removal
+        var plot = placed.GetComponent<FarmPlot>();
+        if (plot != null)
+        {
+            plot.GridX = ghostX;
+            plot.GridZ = ghostZ;
+        }
+
         foreach (var mb in placed.GetComponentsInChildren<MonoBehaviour>())
             mb.enabled = true;
 
@@ -152,22 +157,21 @@ public class PlacementController : MonoBehaviour
 
         Destroy(ghostObject);
 
-        // Check if player can afford another one and keep placing if so
         PlaceableData justPlaced = currentData;
         isPlacing       = false;
         costAlreadyPaid = false;
         currentData     = null;
         ghostObject     = null;
 
-         if (GameManager.Instance.CanAfford(justPlaced.unlockCost))
+        if (GameManager.Instance.CanAfford(justPlaced.unlockCost))
         {
             BeginPlacement(justPlaced, paid: false);
-            TutorialConsole.Log($"Click to place another {justPlaced.placeableName}, or press Escape to stop.");
+            TutorialConsole.Log($"Click to place another {justPlaced.placeableName}. Escape to stop.");
         }
         else
         {
             TutorialConsole.Warn($"Not enough coins for another {justPlaced.placeableName}.");
-        } 
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────

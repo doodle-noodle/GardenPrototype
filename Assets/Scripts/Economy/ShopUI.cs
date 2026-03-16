@@ -79,7 +79,7 @@ public class ShopUI : MonoBehaviour
             new Vector2(PanelW - 20f, 30f)).GetComponent<TextMeshProUGUI>();
 
          float buyHeaderY = timerY - 30f - Gap;
-        MakeText(shopPanel.transform, "— For Sale —", FontHeader,
+        MakeText(shopPanel.transform, "Buy", FontHeader,
             new Vector2(0f, buyHeaderY),
              new Vector2(PanelW - 20f, 36f));
 
@@ -90,7 +90,7 @@ public class ShopUI : MonoBehaviour
         stockContainer = stockScroll.transform.Find("Content");
     
         float sellHeaderY = buyScrollY - ScrollBuyH * 0.5f - Gap - 18f;
-        MakeText(shopPanel.transform, "— Sell Harvest —", FontHeader,
+        MakeText(shopPanel.transform, "Sell", FontHeader,
             new Vector2(0f, sellHeaderY),
             new Vector2(PanelW - 20f, 36f));
 
@@ -188,8 +188,14 @@ public class ShopUI : MonoBehaviour
                     $"{item.Placeable.placeableName}. Press Escape to cancel.");
                 CloseShop();
                 break;
+            case ShopItem.ItemType.Tool:
+                Inventory.Instance.AddTool(item.Tool);
+                TutorialConsole.Log($"Bought {RarityUtility.RarityLabel(item.Rarity)} " +
+                    $"{item.Tool.toolName}. Select it from your inventory to use it.");
+                break;
         }
     }
+        
 
     // ── Sell ──────────────────────────────────────────────────
 
