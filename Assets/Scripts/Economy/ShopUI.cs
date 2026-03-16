@@ -7,6 +7,23 @@ public class ShopUI : MonoBehaviour
 {
     public static ShopUI Instance;
     public static bool IsOpen { get; private set; }
+
+    // ── Font sizes ────────────────────────────────────────────
+    private const int FontTitle  = 44;
+    private const int FontHeader = 28;
+    private const int FontBody   = 24;
+    private const int FontSmall  = 22;
+
+    // ── Panel layout ──────────────────────────────────────────
+    private const float PanelW      = 560f;
+    private const float PanelH      = 880f;
+    private const float ButtonW     = 520f;
+    private const float ButtonH     = 60f;
+    private const float ScrollBuyH  = 280f;
+    private const float ScrollSellH = 180f;
+    private const float Gap         = 16f;
+
+    // ── References ────────────────────────────────────────────
     public PlaceableData farmPlotPlaceable;
 
     private GameObject      shopPanel;
@@ -15,6 +32,8 @@ public class ShopUI : MonoBehaviour
     private TextMeshProUGUI noHarvestText;
     private TextMeshProUGUI refreshTimerText;
     private bool            isOpen = false;
+
+    // ── Lifecycle ─────────────────────────────────────────────
 
     void Awake()
     {
@@ -35,54 +54,81 @@ public class ShopUI : MonoBehaviour
 
     void Update()
     {
-        if (isOpen && refreshTimerText != null && ShopStock.Instance != null)
-        {
-            float t = ShopStock.Instance.TimeUntilRefresh;
-            refreshTimerText.text = $"Refreshes in: {(int)(t / 60)}:{(t % 60):00}";
-        }
+        if (!isOpen || refreshTimerText == null || ShopStock.Instance == null) return;
+        float t = ShopStock.Instance.TimeUntilRefresh;
+        refreshTimerText.text = $"Refreshes in: {(int)(t / 60)}:{(t % 60):00}";
     }
 
-    #region Build UI
+    // ── Build UI ──────────────────────────────────────────────
 
     void BuildShopUI()
     {
         Canvas canvas = FindFirstObjectByType<Canvas>();
-        shopPanel = MakePanel(canvas.transform, new Vector2(440, 620), "ShopPanel");
+        shopPanel     = MakePanel(canvas.transform, new Vector2(PanelW, PanelH), "ShopPanel");
 
-        MakeText(shopPanel.transform, "Shop", 22,
-            new Vector2(0, 285), new Vector2(420, 40));
+        // Layout top-down using explicit y positions
+        float top = PanelH * 0.5f;
 
-        refreshTimerText = MakeText(shopPanel.transform, "", 12,
-            new Vector2(0, 258), new Vector2(420, 24)).GetComponent<TextMeshProUGUI>();
+        // Title
+        float titleH = 52f;
+        MakeText(shopPanel.transform, "Shop", FontTitle,
+            new Vector2(0f, top - titleH * 0.5f - Gap),
+            new Vector2(PanelW - 20f, titleH));
 
-        MakeText(shopPanel.transform, "— For Sale —", 14,
-            new Vector2(0, 228), new Vector2(420, 28));
+        // Refresh timer
+        float timerY = top - titleH - Gap * 2f - 15f;
+        refreshTimerText = MakeText(shopPanel.transform, "", FontSmall,
+            new Vector2(0f, timerY),
+            new Vector2(PanelW - 20f, 30f)).GetComponent<TextMeshProUGUI>();
 
-        GameObject stockScroll = MakeScrollArea(shopPanel.transform,
-            new Vector2(0, 100), new Vector2(420, 240));
+        // For Sale header
+        float buyHeaderY = timerY - 30f - Gap;
+        MakeText(shopPanel.transform, "— For Sale —", FontHeader,
+            new Vector2(0f, buyHeaderY),
+            new Vector2(PanelW - 20f, 36f));
+
+        // Buy scroll
+        float buyScrollY = buyHeaderY - 36f * 0.5f - ScrollBuyH * 0.5f - Gap;
+        var   stockScroll = MakeScrollArea(shopPanel.transform,
+            new Vector2(0f, buyScrollY),
+            new Vector2(PanelW - 20f, ScrollBuyH));
         stockContainer = stockScroll.transform.Find("Content");
 
-        MakeText(shopPanel.transform, "— Sell Harvest —", 14,
-            new Vector2(0, -65), new Vector2(420, 28));
+        // Sell Harvest header
+        float sellHeaderY = buyScrollY - ScrollBuyH * 0.5f - Gap - 18f;
+        MakeText(shopPanel.transform, "— Sell Harvest —", FontHeader,
+            new Vector2(0f, sellHeaderY),
+            new Vector2(PanelW - 20f, 36f));
 
-        MakeButton(shopPanel.transform, "Sell All", new Vector2(0, -95),
-            new Vector2(120, 30), new Color(0.5f, 0.35f, 0.05f), () => SellAll());
+        // Sell All button
+        float sellBtnY = sellHeaderY - 36f * 0.5f - ButtonH * 0.5f - Gap * 0.5f;
+        MakeButton(shopPanel.transform, "Sell All",
+            new Vector2(0f, sellBtnY),
+            new Vector2(160f, ButtonH),
+            new Color(0.5f, 0.35f, 0.05f), () => SellAll());
 
-        GameObject sellScroll = MakeScrollArea(shopPanel.transform,
-            new Vector2(0, -190), new Vector2(420, 150));
+        // Sell scroll
+        float sellScrollY = sellBtnY - ButtonH * 0.5f - ScrollSellH * 0.5f - Gap * 0.5f;
+        var   sellScroll  = MakeScrollArea(shopPanel.transform,
+            new Vector2(0f, sellScrollY),
+            new Vector2(PanelW - 20f, ScrollSellH));
         sellContainer = sellScroll.transform.Find("Content");
 
-        var noHarvestObj = MakeText(shopPanel.transform, "Nothing to sell yet.", 13,
-            new Vector2(0, -190), new Vector2(400, 28));
+        // Nothing to sell text (overlaps sell scroll area, hidden by default)
+        var noHarvestObj = MakeText(shopPanel.transform, "Nothing to sell yet.", FontBody,
+            new Vector2(0f, sellScrollY),
+            new Vector2(PanelW - 20f, 36f));
         noHarvestText = noHarvestObj.GetComponent<TextMeshProUGUI>();
 
-        MakeButton(shopPanel.transform, "Close", new Vector2(0, -290),
-            new Vector2(120, 36), new Color(0.7f, 0.25f, 0.25f), () => CloseShop());
+        // Close button at the bottom
+        float closeBtnY = sellScrollY - ScrollSellH * 0.5f - ButtonH * 0.5f - Gap;
+        MakeButton(shopPanel.transform, "Close",
+            new Vector2(0f, closeBtnY),
+            new Vector2(160f, ButtonH),
+            new Color(0.7f, 0.25f, 0.25f), () => CloseShop());
     }
 
-    #endregion
-
-    #region Show / Hide
+    // ── Show / Hide ───────────────────────────────────────────
 
     public void ToggleShop()
     {
@@ -115,9 +161,7 @@ public class ShopUI : MonoBehaviour
         if (isOpen) BuildStockButtons();
     }
 
-    #endregion
-
-    #region Buy
+    // ── Buy ───────────────────────────────────────────────────
 
     void BuildStockButtons()
     {
@@ -127,13 +171,12 @@ public class ShopUI : MonoBehaviour
         foreach (var item in ShopStock.Instance.CurrentStock)
         {
             ShopItem captured = item;
-
-            Color btnColor = RarityUtility.RarityColor(item.Rarity) * 0.55f;
+            Color    btnColor = RarityUtility.RarityColor(item.Rarity) * 0.55f;
             btnColor.a = 1f;
 
             MakeButton(stockContainer,
                 $"{item.DisplayName}  —  {item.Price} coins",
-                Vector2.zero, new Vector2(400, 44),
+                Vector2.zero, new Vector2(ButtonW, ButtonH),
                 btnColor, () => BuyItem(captured));
         }
     }
@@ -158,9 +201,7 @@ public class ShopUI : MonoBehaviour
         }
     }
 
-    #endregion
-
-    #region Sell
+    // ── Sell ──────────────────────────────────────────────────
 
     void RefreshSellButtons()
     {
@@ -184,7 +225,7 @@ public class ShopUI : MonoBehaviour
                            $"x{captured.Count}  —  +{total} coins";
 
             MakeButton(sellContainer, label, Vector2.zero,
-                new Vector2(400, 44),
+                new Vector2(ButtonW, ButtonH),
                 ColorForRank(sample.Rank),
                 () => SellGroup(captured));
         }
@@ -222,8 +263,6 @@ public class ShopUI : MonoBehaviour
         }
 
         GameManager.Instance.AddCoins(total);
-        Vector3 screenCenter = Camera.main.ViewportToWorldPoint(new Vector3(0.5f, 0.4f, 10f));
-        FloatingText.Spawn($"+{total} coins", screenCenter, new Color(1f, 0.85f, 0.1f));
         TutorialConsole.Log($"Sold everything for {total} coins.");
         RefreshSellButtons();
     }
@@ -238,9 +277,7 @@ public class ShopUI : MonoBehaviour
         _      => new Color(0.35f, 0.35f, 0.35f)
     };
 
-    #endregion
-
-    #region UI Helpers
+    // ── UI Helpers ────────────────────────────────────────────
 
     GameObject MakePanel(Transform parent, Vector2 size, string name)
     {
@@ -268,15 +305,15 @@ public class ShopUI : MonoBehaviour
         GameObject content = new GameObject("Content", typeof(RectTransform));
         content.transform.SetParent(scroll.transform, false);
         var crt = content.GetComponent<RectTransform>();
-        crt.anchorMin        = new Vector2(0, 1);
-        crt.anchorMax        = new Vector2(1, 1);
+        crt.anchorMin        = new Vector2(0f, 1f);
+        crt.anchorMax        = new Vector2(1f, 1f);
         crt.pivot            = new Vector2(0.5f, 1f);
         crt.sizeDelta        = Vector2.zero;
         crt.anchoredPosition = Vector2.zero;
 
         var vlg = content.AddComponent<VerticalLayoutGroup>();
-        vlg.spacing              = 6;
-        vlg.padding              = new RectOffset(8, 8, 8, 8);
+        vlg.spacing              = 8;
+        vlg.padding              = new RectOffset(10, 10, 10, 10);
         vlg.childAlignment       = TextAnchor.UpperCenter;
         vlg.childControlWidth    = true;
         vlg.childControlHeight   = false;
@@ -313,12 +350,12 @@ public class ShopUI : MonoBehaviour
         var trt = txt.GetComponent<RectTransform>();
         trt.anchorMin        = Vector2.zero;
         trt.anchorMax        = Vector2.one;
-        trt.sizeDelta        = Vector2.zero;
+        trt.sizeDelta        = new Vector2(-8f, 0f);
         trt.anchoredPosition = Vector2.zero;
 
         var tmp = txt.GetComponent<TextMeshProUGUI>();
         tmp.text      = label;
-        tmp.fontSize  = 12;
+        tmp.fontSize  = FontBody;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.color     = Color.white;
         tmp.richText  = true;
@@ -345,6 +382,4 @@ public class ShopUI : MonoBehaviour
 
         return go;
     }
-
-    #endregion
 }
