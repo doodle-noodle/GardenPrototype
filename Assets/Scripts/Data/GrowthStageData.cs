@@ -1,13 +1,20 @@
 using UnityEngine;
 
+// Growth logic — used by FarmPlot state machine
 [System.Serializable]
 public class GrowthStage
 {
-    public string stageName;        // "Seedling", "Sprout", "Mature"
-    public float duration;          // seconds in this stage
-    public Color stageColor;        // color of the visual sphere
-    [Range(0.1f, 1f)]
-    public float scale;             // how big the visual is at this stage
+    public string stageName;
+    public float  duration;
+    public float  mutationBonus;  // future: extra mutation chance at this stage
+}
 
+// Growth visuals — used by FarmPlotVisual only
+[System.Serializable]
+public class GrowthStageVisual
+{
     public GameObject visualPrefab;
+    public Color      stageColor = Color.green;
+    [Range(0.05f, 2f)]
+    public float      scale      = 0.3f;
 }

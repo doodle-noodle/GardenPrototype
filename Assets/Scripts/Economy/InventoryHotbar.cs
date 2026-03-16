@@ -7,35 +7,31 @@ public class InventoryHotbar : MonoBehaviour
     public static InventoryHotbar Instance;
 
     // ── Layout ────────────────────────────────────────────────
-    private const int   FontBody       = 20;
-    private const int   FontLabel      = 14;
-    private const float SlotW          = 80f;
-    private const float SlotH          = 72f;
-    private const float SlotSpacing    = 6f;
-    private const float PanelPadding   = 10f;
-    private const float BottomPad      = 20f;
-
-    // ── Colors ────────────────────────────────────────────────
-    private static Color ColorEmpty    => UIColors.SlotEmpty;
-    private static Color ColorSeed     => UIColors.SlotSeed;
-    private static Color ColorHarvest  => UIColors.SlotHarvest;
-    private static Color ColorSelected => UIColors.SlotSelected;
-    private static Color ColorPanel    => UIColors.SlotPanel;
-    private static Color ColorDimText  => UIColors.TextDim;
-    private static Color ColorSeedTag  => UIColors.TagSeed;
-    private static Color ColorHarvTag  => UIColors.TagHarvest;
+    private const int   FontBody     = 20;
+    private const int   FontLabel    = 14;
+    private const float SlotW        = 80f;
+    private const float SlotH        = 72f;
+    private const float SlotSpacing  = 6f;
+    private const float PanelPadding = 10f;
+    private const float BottomPad    = 20f;
 
     // ── Slot sub-elements ─────────────────────────────────────
     private struct SlotElements
     {
-        public GameObject    Root;
-        public Image         Background;
-        public TextMeshProUGUI MainLabel;
-        public TextMeshProUGUI TypeLabel;
-        public Button        Btn;
+        public Image            Background;
+        public TextMeshProUGUI  MainLabel;
+        public TextMeshProUGUI  TypeLabel;
+        public Button           Btn;
     }
 
     private SlotElements[] slotElements;
+
+    // ── Stored event handlers — prevents lambda memory leaks ──
+    private System.Action<CropData>      _onSeedAdded;
+    private System.Action<CropData>      _onSeedUsed;
+    private System.Action<HarvestedCrop> _onCropHarvested;
+    private System.Action<HarvestedCrop> _onCropSold;
+    private System.Action                _onShopClosed;
 
     // ── Lifecycle ─────────────────────────────────────────────
 
@@ -43,20 +39,26 @@ public class InventoryHotbar : MonoBehaviour
     {
         Instance = this;
 
-        EventBus.OnSeedAdded     += _ => Refresh();
-        EventBus.OnSeedUsed      += _ => Refresh();
-        EventBus.OnCropHarvested += _ => Refresh();
-        EventBus.OnCropSold      += _ => Refresh();
-        EventBus.OnShopClosed    += Refresh;
+        _onSeedAdded     = _ => Refresh();
+        _onSeedUsed      = _ => Refresh();
+        _onCropHarvested = _ => Refresh();
+        _onCropSold      = _ => Refresh();
+        _onShopClosed    = Refresh;
+
+        EventBus.OnSeedAdded     += _onSeedAdded;
+        EventBus.OnSeedUsed      += _onSeedUsed;
+        EventBus.OnCropHarvested += _onCropHarvested;
+        EventBus.OnCropSold      += _onCropSold;
+        EventBus.OnShopClosed    += _onShopClosed;
     }
 
     void OnDestroy()
     {
-        EventBus.OnSeedAdded     -= _ => Refresh();
-        EventBus.OnSeedUsed      -= _ => Refresh();
-        EventBus.OnCropHarvested -= _ => Refresh();
-        EventBus.OnCropSold      -= _ => Refresh();
-        EventBus.OnShopClosed    -= Refresh;
+        EventBus.OnSeedAdded     -= _onSeedAdded;
+        EventBus.OnSeedUsed      -= _onSeedUsed;
+        EventBus.OnCropHarvested -= _onCropHarvested;
+        EventBus.OnCropSold      -= _onCropSold;
+        EventBus.OnShopClosed    -= _onShopClosed;
     }
 
     void Start()
@@ -75,10 +77,10 @@ public class InventoryHotbar : MonoBehaviour
 
     void BuildHotbar()
     {
-        Canvas canvas  = FindFirstObjectByType<Canvas>();
-        int    count   = Inventory.MaxSlots;
-        float  panelW  = count * SlotW + (count - 1) * SlotSpacing + PanelPadding * 2f;
-        float  panelH  = SlotH + PanelPadding * 2f;
+        Canvas canvas = FindFirstObjectByType<Canvas>();
+        int    count  = Inventory.MaxSlots;
+        float  panelW = count * SlotW + (count - 1) * SlotSpacing + PanelPadding * 2f;
+        float  panelH = SlotH + PanelPadding * 2f;
 
         GameObject panel = new GameObject("InventoryHotbar", typeof(RectTransform),
             typeof(CanvasRenderer), typeof(Image));
@@ -90,7 +92,7 @@ public class InventoryHotbar : MonoBehaviour
         rt.pivot            = new Vector2(0.5f, 0f);
         rt.anchoredPosition = new Vector2(0f, BottomPad);
         rt.sizeDelta        = new Vector2(panelW, panelH);
-        panel.GetComponent<Image>().color = ColorPanel;
+        panel.GetComponent<Image>().color = UIColors.SlotPanel;
 
         slotElements = new SlotElements[count];
 
@@ -98,14 +100,12 @@ public class InventoryHotbar : MonoBehaviour
         {
             float xPos = -((count - 1) * (SlotW + SlotSpacing) * 0.5f)
                          + i * (SlotW + SlotSpacing);
-
             slotElements[i] = BuildSlot(panel.transform, i, xPos);
         }
     }
 
     SlotElements BuildSlot(Transform parent, int index, float xPos)
     {
-        // Root
         GameObject root = new GameObject($"Slot_{index + 1}", typeof(RectTransform),
             typeof(CanvasRenderer), typeof(Image), typeof(Button));
         root.transform.SetParent(parent, false);
@@ -117,24 +117,19 @@ public class InventoryHotbar : MonoBehaviour
         srt.sizeDelta        = new Vector2(SlotW, SlotH);
         srt.anchoredPosition = new Vector2(xPos, 0f);
 
-        // Main label (crop name + count)
         var mainLabel = MakeLabel(root.transform, "MainLabel",
             new Vector2(0f, 4f), new Vector2(-4f, -20f),
             FontBody, TextAlignmentOptions.Center);
-
         mainLabel.text  = $"[{index + 1}]";
-        mainLabel.color = ColorDimText;
+        mainLabel.color = UIColors.TextDim;
 
-        // Type label (SEED / CROP) at bottom of slot
         var typeLabel = MakeLabel(root.transform, "TypeLabel",
             new Vector2(0f, -SlotH * 0.5f + 10f), new Vector2(-4f, 18f),
             FontLabel, TextAlignmentOptions.Center);
-
-        typeLabel.color = ColorDimText;
+        typeLabel.color = UIColors.TextDim;
 
         return new SlotElements
         {
-            Root       = root,
             Background = root.GetComponent<Image>(),
             MainLabel  = mainLabel,
             TypeLabel  = typeLabel,
@@ -156,36 +151,29 @@ public class InventoryHotbar : MonoBehaviour
             el.Btn.onClick.RemoveAllListeners();
 
             if (slot.IsEmpty)
-            {
                 SetEmptySlot(el, i);
-            }
             else if (slot.Type == InventoryItemType.Seed)
-            {
-                bool isSelected = Inventory.Instance.SelectedSeed == slot.Crop;
-                SetSeedSlot(el, slot, isSelected);
-            }
+                SetSeedSlot(el, slot, Inventory.Instance.SelectedSeed == slot.Crop);
             else if (slot.Type == InventoryItemType.Harvest)
-            {
                 SetHarvestSlot(el, slot);
-            }
         }
     }
 
     void SetEmptySlot(SlotElements el, int index)
     {
-        el.Background.color = ColorEmpty;
+        el.Background.color = UIColors.SlotEmpty;
         el.MainLabel.text   = $"[{index + 1}]";
-        el.MainLabel.color  = ColorDimText;
+        el.MainLabel.color  = UIColors.TextDim;
         el.TypeLabel.text   = "";
     }
 
     void SetSeedSlot(SlotElements el, InventorySlot slot, bool isSelected)
     {
-        el.Background.color = isSelected ? ColorSelected : ColorSeed;
+        el.Background.color = isSelected ? UIColors.SlotSelected : UIColors.SlotSeed;
         el.MainLabel.text   = $"{slot.Crop.cropName}\nx{slot.SeedCount}";
-        el.MainLabel.color  = Color.white;
+        el.MainLabel.color  = UIColors.TextPrimary;
         el.TypeLabel.text   = "SEED";
-        el.TypeLabel.color  = ColorSeedTag;
+        el.TypeLabel.color  = UIColors.TagSeed;
 
         CropData captured = slot.Crop;
         el.Btn.onClick.AddListener(() =>
@@ -197,11 +185,11 @@ public class InventoryHotbar : MonoBehaviour
 
     void SetHarvestSlot(SlotElements el, InventorySlot slot)
     {
-        el.Background.color = ColorHarvest;
+        el.Background.color = UIColors.SlotHarvest;
         el.MainLabel.text   = $"{slot.Crop.cropName}\nx{slot.Harvested.Count}";
-        el.MainLabel.color  = Color.white;
+        el.MainLabel.color  = UIColors.TextPrimary;
         el.TypeLabel.text   = "CROP";
-        el.TypeLabel.color  = ColorHarvTag;
+        el.TypeLabel.color  = UIColors.TagHarvest;
     }
 
     // ── Number keys ───────────────────────────────────────────
@@ -224,8 +212,8 @@ public class InventoryHotbar : MonoBehaviour
     // ── Helpers ───────────────────────────────────────────────
 
     TextMeshProUGUI MakeLabel(Transform parent, string name,
-        Vector2 anchoredPos, Vector2 sizeDelta, int fontSize,
-        TextAlignmentOptions alignment)
+        Vector2 anchoredPos, Vector2 sizeDelta,
+        int fontSize, TextAlignmentOptions alignment)
     {
         GameObject go = new GameObject(name, typeof(RectTransform),
             typeof(CanvasRenderer), typeof(TextMeshProUGUI));
@@ -240,7 +228,7 @@ public class InventoryHotbar : MonoBehaviour
         var tmp = go.GetComponent<TextMeshProUGUI>();
         tmp.fontSize  = fontSize;
         tmp.alignment = alignment;
-        tmp.color     = Color.white;
+        tmp.color     = UIColors.TextPrimary;
 
         return tmp;
     }

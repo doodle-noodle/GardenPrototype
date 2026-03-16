@@ -20,6 +20,7 @@ public class FarmPlot : MonoBehaviour
         if (State != PlotState.Growing) return;
 
         StageTimer += Time.deltaTime;
+
         GrowthStage stage        = ActiveCrop.growthStages[CurrentStage];
         bool        isFinalStage = CurrentStage == ActiveCrop.growthStages.Length - 1;
 
@@ -50,8 +51,9 @@ public class FarmPlot : MonoBehaviour
             case PlotState.Ready:   Harvest();  break;
             case PlotState.Growing:
                 float remaining = ActiveCrop.growthStages[CurrentStage].duration - StageTimer;
-                TutorialConsole.Log($"{ActiveCrop.cropName} — stage {CurrentStage + 1}/" +
-                    $"{ActiveCrop.growthStages.Length}, ready in {remaining:F1}s.");
+                TutorialConsole.Log($"{ActiveCrop.cropName} — stage " +
+                    $"{CurrentStage + 1}/{ActiveCrop.growthStages.Length}, " +
+                    $"ready in {remaining:F1}s.");
                 break;
         }
     }
@@ -93,33 +95,27 @@ public class FarmPlot : MonoBehaviour
 
     void Harvest()
     {
-        // Roll for mutation
-        bool mutated = Random.value < ActiveCrop.mutationChance;
-        if (mutated)
+        // All harvest outcome logic lives in HarvestResolver
+        var result = HarvestResolver.Resolve(ActiveCrop);
+
+        if (result.IsMutated)
         {
             IsMutated = true;
             EventBus.Raise_MutationOccurred(this);
-            TutorialConsole.Log($"<color=#CC88FF>Mutation! {ActiveCrop.cropName} has mutated!</color>");
+            TutorialConsole.Log(
+                $"<color={UIColors.RarityMythical_Hex}>Mutation! " +
+                $"{ActiveCrop.cropName} has mutated!</color>");
         }
 
-        // Roll for rank
-        Rank rank = RankUtility.RollRank();
+        Inventory.Instance.AddHarvest(result);
 
-        // Switch crop type if mutatesInto is assigned
-        CropData finalCrop = (mutated && ActiveCrop.mutatesInto != null)
-            ? ActiveCrop.mutatesInto
-            : ActiveCrop;
-
-        var harvested = new HarvestedCrop(finalCrop, rank, mutated);
         FloatingText.Spawn(
-            $"+{harvested.SellValue}  {RankUtility.RankLabel(rank)}",
+            $"+{result.SellValue}  {RankUtility.RankLabel(result.Rank)}",
             transform.position + Vector3.up * 1.5f,
             UIColors.FloatingGold);
 
-        Inventory.Instance.AddHarvest(harvested);
-
-        TutorialConsole.Log($"Harvested {RankUtility.RankLabel(rank)} " +
-            $"{harvested.DisplayName} — worth {harvested.SellValue} coins.");
+        TutorialConsole.Log($"Harvested {RankUtility.RankLabel(result.Rank)} " +
+            $"{result.DisplayName} — worth {result.SellValue} coins.");
 
         ActiveCrop   = null;
         CurrentStage = -1;

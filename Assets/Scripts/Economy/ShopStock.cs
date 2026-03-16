@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class ShopStock : MonoBehaviour
@@ -9,11 +10,10 @@ public class ShopStock : MonoBehaviour
     public int   itemsPerRefresh = 6;
     public float refreshInterval = 300f;
 
-    [Header("All possible items")]
-    public CropData[]      allCrops;
-    public PlaceableData[] allPlaceables;
+    [Header("All shop items — drag any CropData or PlaceableData here")]
+    public List<ScriptableObject> allShopItems;
 
-    public List<ShopItem> CurrentStock { get; private set; } = new();
+    public List<ShopItem> CurrentStock { get; private set; } = new List<ShopItem>();
 
     private float refreshTimer = 0f;
 
@@ -36,14 +36,11 @@ public class ShopStock : MonoBehaviour
     {
         CurrentStock.Clear();
 
-        var pool = new List<ShopItem>();
-
-        // Use each item's fixed rarity instead of rolling randomly
-        foreach (var crop in allCrops)
-            pool.Add(ShopItem.MakeSeed(crop, crop.rarity));
-
-        foreach (var placeable in allPlaceables)
-            pool.Add(ShopItem.MakePlaceable(placeable, placeable.rarity));
+        // Any ScriptableObject implementing IShopable is valid stock
+        var pool = allShopItems
+            .OfType<IShopable>()
+            .Select(item => item.CreateShopItem())
+            .ToList();
 
         // Shuffle
         for (int i = pool.Count - 1; i > 0; i--)
@@ -57,5 +54,6 @@ public class ShopStock : MonoBehaviour
             CurrentStock.Add(pool[i]);
 
         EventBus.Raise_ShopStockRefreshed();
+        Debug.Log($"Shop refreshed — {CurrentStock.Count} items available.");
     }
 }

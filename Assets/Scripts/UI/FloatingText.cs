@@ -1,36 +1,80 @@
-using System.Collections;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 
-public class FloatingText : MonoBehaviour
+public static class FloatingText
 {
+    private static readonly Queue<GameObject> Pool = new Queue<GameObject>();
+    private static Canvas  _cachedCanvas;
+    private static Camera  _cachedCamera;
+
+    // ── Public API ────────────────────────────────────────────
+
     public static void Spawn(string text, Vector3 worldPos, Color color)
     {
-        Canvas canvas = FindFirstObjectByType<Canvas>();
+        EnsureCache();
+        if (_cachedCanvas == null) return;
 
-        GameObject go = new GameObject("FloatingText", typeof(RectTransform),
-            typeof(CanvasRenderer), typeof(TextMeshProUGUI));
-        go.transform.SetParent(canvas.transform, false);
-
-        var tmp = go.GetComponent<TextMeshProUGUI>();
-        tmp.text      = text;
-        tmp.fontSize  = 36;
-        tmp.fontStyle = FontStyles.Bold;
-        tmp.color     = color;
-        tmp.richText  = true;
-        tmp.alignment = TextAlignmentOptions.Center;
+        GameObject go  = GetFromPool();
+        var        tmp = go.GetComponent<TextMeshProUGUI>();
+        tmp.text  = text;
+        tmp.color = color;
 
         var rt = go.GetComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(200, 50);
+        rt.sizeDelta = new Vector2(200f, 50f);
 
-        // Convert world position to screen position
-        Vector2 screenPos = Camera.main.WorldToScreenPoint(worldPos);
+        Vector2 screenPos = _cachedCamera.WorldToScreenPoint(worldPos);
         RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            canvas.GetComponent<RectTransform>(),
-            screenPos, canvas.worldCamera, out Vector2 localPos);
+            _cachedCanvas.GetComponent<RectTransform>(),
+            screenPos, _cachedCanvas.worldCamera, out Vector2 localPos);
         rt.anchoredPosition = localPos;
 
-        go.AddComponent<FloatingTextMover>().Init(color);
+        go.SetActive(true);
+        go.GetComponent<FloatingTextMover>().Init(color);
+    }
+
+    public static void ReturnToPool(GameObject go)
+    {
+        if (go == null) return;
+        go.SetActive(false);
+        Pool.Enqueue(go);
+    }
+
+    // ── Pool internals ────────────────────────────────────────
+
+    static void EnsureCache()
+    {
+        if (_cachedCanvas == null)
+            _cachedCanvas = Object.FindFirstObjectByType<Canvas>();
+        if (_cachedCamera == null)
+            _cachedCamera = Camera.main;
+    }
+
+    static GameObject GetFromPool()
+    {
+        // Drain stale null references from old scenes
+        while (Pool.Count > 0)
+        {
+            var go = Pool.Dequeue();
+            if (go != null) return go;
+        }
+        return CreateNew();
+    }
+
+    static GameObject CreateNew()
+    {
+        GameObject go = new GameObject("FloatingText", typeof(RectTransform),
+            typeof(CanvasRenderer), typeof(TextMeshProUGUI), typeof(FloatingTextMover));
+        go.transform.SetParent(_cachedCanvas.transform, false);
+
+        var tmp = go.GetComponent<TextMeshProUGUI>();
+        tmp.fontSize  = 18;
+        tmp.fontStyle = FontStyles.Bold;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.richText  = true;
+
+        go.SetActive(false);
+        return go;
     }
 }
 
@@ -39,12 +83,13 @@ public class FloatingTextMover : MonoBehaviour
     private float   elapsed  = 0f;
     private float   duration = 1.4f;
     private Vector2 startPos;
-    private Color   color;
+    private Color   startColor;
 
-    public void Init(Color c)
+    public void Init(Color color)
     {
-        color    = c;
-        startPos = GetComponent<RectTransform>().anchoredPosition;
+        elapsed    = 0f;
+        startColor = color;
+        startPos   = GetComponent<RectTransform>().anchoredPosition;
     }
 
     void Update()
@@ -52,14 +97,14 @@ public class FloatingTextMover : MonoBehaviour
         elapsed += Time.deltaTime;
         float t = elapsed / duration;
 
-        var rt  = GetComponent<RectTransform>();
+        var rt = GetComponent<RectTransform>();
         rt.anchoredPosition = startPos + Vector2.up * (60f * t);
 
-        var tmp    = GetComponent<TextMeshProUGUI>();
-        var col    = color;
-        col.a      = Mathf.Lerp(1f, 0f, t * t);
-        tmp.color  = col;
+        var col = startColor;
+        col.a   = Mathf.Lerp(1f, 0f, t * t);
+        GetComponent<TextMeshProUGUI>().color = col;
 
-        if (elapsed >= duration) Destroy(gameObject);
+        if (elapsed >= duration)
+            FloatingText.ReturnToPool(gameObject);
     }
 }

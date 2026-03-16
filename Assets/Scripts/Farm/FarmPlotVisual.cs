@@ -1,6 +1,5 @@
 ﻿using System.Collections;
 using UnityEngine;
-using UnityEngine.UI;
 using TMPro;
 
 [RequireComponent(typeof(FarmPlot))]
@@ -10,11 +9,16 @@ public class FarmPlotVisual : MonoBehaviour
     private FarmPlot.PlotState lastState;
     private int                lastStage = -1;
 
-    private GameObject      cropObject;
-    private GameObject      ghostObject;
-    private GameObject      timerLabel;
-    private Renderer        plotRenderer;
-    private Color           defaultPlotColor;
+    private GameObject cropObject;
+    private GameObject ghostObject;
+    private GameObject timerLabel;
+
+    private Renderer plotRenderer;
+    private Color    defaultPlotColor;
+
+    // Cached references — avoids per-frame scene searches
+    private Camera _mainCamera;
+    private Canvas _canvas;
 
     // ── Setup ─────────────────────────────────────────────────
 
@@ -23,6 +27,8 @@ public class FarmPlotVisual : MonoBehaviour
         plot             = GetComponent<FarmPlot>();
         lastState        = plot.State;
         plotRenderer     = GetComponent<Renderer>();
+        _mainCamera      = Camera.main;
+        _canvas          = FindFirstObjectByType<Canvas>();
 
         if (plotRenderer != null)
             defaultPlotColor = plotRenderer.material.color;
@@ -42,13 +48,12 @@ public class FarmPlotVisual : MonoBehaviour
         // Pulse when ready
         if (plot.State == FarmPlot.PlotState.Ready && cropObject != null)
         {
+            GrowthStageVisual visual = GetStageVisual(plot.ActiveCrop, plot.CurrentStage);
             float pulse = 1f + Mathf.Sin(Time.time * 3f) * 0.08f;
-            GrowthStage stage = plot.ActiveCrop.growthStages[plot.CurrentStage];
-            float s = stage.scale * pulse;
+            float s     = visual.scale * pulse;
             cropObject.transform.localScale = new Vector3(s, s, s);
         }
 
-        // Update timer label text every frame while visible
         UpdateTimerLabel();
     }
 
@@ -76,7 +81,6 @@ public class FarmPlotVisual : MonoBehaviour
     {
         if (plot.State == FarmPlot.PlotState.Empty && ghostObject == null)
             OnHoverEnter();
-
         if (plot.State == FarmPlot.PlotState.Growing && timerLabel == null)
             ShowTimerLabel();
     }
@@ -85,7 +89,6 @@ public class FarmPlotVisual : MonoBehaviour
     {
         if (plotRenderer != null)
             plotRenderer.material.color = defaultPlotColor;
-
         HideGhost();
         HideTimerLabel();
     }
@@ -94,21 +97,18 @@ public class FarmPlotVisual : MonoBehaviour
 
     void ShowTimerLabel()
     {
-        if (timerLabel != null) return;
-
-        Canvas canvas = FindFirstObjectByType<Canvas>();
+        if (timerLabel != null || _canvas == null) return;
 
         timerLabel = new GameObject("TimerLabel", typeof(RectTransform),
             typeof(CanvasRenderer), typeof(TextMeshProUGUI));
-        timerLabel.transform.SetParent(canvas.transform, false);
+        timerLabel.transform.SetParent(_canvas.transform, false);
 
         var tmp = timerLabel.GetComponent<TextMeshProUGUI>();
         tmp.fontSize  = 22;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.color     = Color.white;
 
-        var rt = timerLabel.GetComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(120f, 36f);
+        timerLabel.GetComponent<RectTransform>().sizeDelta = new Vector2(120f, 36f);
     }
 
     void UpdateTimerLabel()
@@ -120,48 +120,34 @@ public class FarmPlotVisual : MonoBehaviour
             return;
         }
 
-        // Format time remaining
-        float remaining = plot.ActiveCrop.growthStages[plot.CurrentStage].duration - plot.StageTimer;
+        // Total time remaining across all stages from current to last
+        float remaining = plot.ActiveCrop.growthStages[plot.CurrentStage].duration
+                          - plot.StageTimer;
         for (int i = plot.CurrentStage + 1; i < plot.ActiveCrop.growthStages.Length - 1; i++)
             remaining += plot.ActiveCrop.growthStages[i].duration;
 
         string timeText;
-        if (remaining >= 3600f)
-            timeText = $"{(int)(remaining / 3600f)}h";
-        else if (remaining >= 60f)
-            timeText = $"{(int)(remaining / 60f)}m";
-        else
-            timeText = $"{remaining:F1}s";
+        if      (remaining >= 3600f) timeText = $"{(int)(remaining / 3600f)}h";
+        else if (remaining >= 60f)   timeText = $"{(int)(remaining / 60f)}m";
+        else                         timeText = $"{remaining:F1}s";
 
         timerLabel.GetComponent<TextMeshProUGUI>().text = timeText;
 
-        // Position above the crop in world space
-        Vector3 worldPos   = transform.position + Vector3.up * 1.5f;
-        Vector3 screenPos  = Camera.main.WorldToScreenPoint(worldPos);
+        Vector3 worldPos  = transform.position + Vector3.up * 1.5f;
+        Vector3 screenPos = _mainCamera.WorldToScreenPoint(worldPos);
 
-        // Only show if in front of camera
-        if (screenPos.z < 0f)
-        {
-            timerLabel.SetActive(false);
-            return;
-        }
+        if (screenPos.z < 0f) { timerLabel.SetActive(false); return; }
 
         timerLabel.SetActive(true);
-
         RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            FindFirstObjectByType<Canvas>().GetComponent<RectTransform>(),
+            _canvas.GetComponent<RectTransform>(),
             screenPos, null, out Vector2 localPos);
-
         timerLabel.GetComponent<RectTransform>().anchoredPosition = localPos;
     }
 
     void HideTimerLabel()
     {
-        if (timerLabel != null)
-        {
-            Destroy(timerLabel);
-            timerLabel = null;
-        }
+        if (timerLabel != null) { Destroy(timerLabel); timerLabel = null; }
     }
 
     // ── Ghost ─────────────────────────────────────────────────
@@ -169,11 +155,11 @@ public class FarmPlotVisual : MonoBehaviour
     void ShowGhost()
     {
         HideGhost();
-
         CropData seed = Inventory.Instance.SelectedSeed;
-        if (seed == null || seed.growthStages.Length == 0) return;
+        if (seed == null) return;
 
-        ghostObject = SpawnVisual(seed.growthStages[0]);
+        GrowthStageVisual visual = GetStageVisual(seed, 0);
+        ghostObject = SpawnVisual(visual);
 
         if (PlacementController.GhostValid != null)
             ghostObject.GetComponent<Renderer>().material = PlacementController.GhostValid;
@@ -196,18 +182,18 @@ public class FarmPlotVisual : MonoBehaviour
 
         if (plot.ActiveCrop == null || plot.CurrentStage < 0) return;
 
-        GrowthStage stage = plot.ActiveCrop.growthStages[plot.CurrentStage];
+        GrowthStageVisual visual = GetStageVisual(plot.ActiveCrop, plot.CurrentStage);
         ClearCropVisual();
-        cropObject = SpawnVisual(stage);
+        cropObject = SpawnVisual(visual);
 
         if (plot.State == FarmPlot.PlotState.Ready)
         {
             var rend = cropObject.GetComponent<Renderer>();
             if (rend != null)
-                rend.material.color = Color.Lerp(stage.stageColor, Color.yellow, 0.4f);
+                rend.material.color = Color.Lerp(visual.stageColor, Color.yellow, 0.4f);
         }
 
-        StartCoroutine(ScalePop(cropObject, stage.scale));
+        StartCoroutine(ScalePop(cropObject, visual.scale));
     }
 
     void ClearCropVisual()
@@ -239,23 +225,33 @@ public class FarmPlotVisual : MonoBehaviour
             target.transform.localScale = Vector3.one * finalScale;
     }
 
-    // ── Shared spawn helper ───────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────
 
-    GameObject SpawnVisual(GrowthStage stage)
+    // Returns the visual for a given stage, with a safe fallback
+    GrowthStageVisual GetStageVisual(CropData crop, int stageIndex)
     {
-        GameObject go = stage.visualPrefab != null
-            ? Instantiate(stage.visualPrefab)
+        if (crop.stageVisuals != null && stageIndex < crop.stageVisuals.Length)
+            return crop.stageVisuals[stageIndex];
+
+        // Fallback if stageVisuals not configured in Inspector
+        return new GrowthStageVisual { stageColor = Color.green, scale = 0.3f };
+    }
+
+    GameObject SpawnVisual(GrowthStageVisual visual)
+    {
+        GameObject go = visual.visualPrefab != null
+            ? Instantiate(visual.visualPrefab)
             : GameObject.CreatePrimitive(PrimitiveType.Sphere);
 
-        if (stage.visualPrefab == null)
-            go.GetComponent<Renderer>().material.color = stage.stageColor;
+        if (visual.visualPrefab == null)
+            go.GetComponent<Renderer>().material.color = visual.stageColor;
 
         go.transform.SetParent(null);
 
         foreach (var col in go.GetComponentsInChildren<Collider>())
             Destroy(col);
 
-        float s = stage.scale;
+        float s = visual.scale;
         go.transform.localScale = new Vector3(s, s, s);
 
         Vector3 plotTop = transform.position + Vector3.up * (transform.lossyScale.y * 0.5f);

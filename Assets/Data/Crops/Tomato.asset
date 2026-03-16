@@ -19,19 +19,23 @@ MonoBehaviour:
   growthStages:
   - stageName: Seedling
     duration: 8
-    stageColor: {r: 0.5046352, g: 1, b: 0, a: 0}
-    scale: 0.3
-    visualPrefab: {fileID: 0}
+    mutationBonus: 0
   - stageName: Sprout
     duration: 8
-    stageColor: {r: 0.764151, g: 0.4651244, b: 0.18382876, a: 0}
-    scale: 0.5
-    visualPrefab: {fileID: 0}
+    mutationBonus: 0
   - stageName: Mature
     duration: 0
-    stageColor: {r: 1, g: 0, b: 0.069642544, a: 0}
-    scale: 0.8
-    visualPrefab: {fileID: 0}
+    mutationBonus: 0
+  stageVisuals:
+  - visualPrefab: {fileID: 0}
+    stageColor: {r: 0.36519918, g: 0.9433962, b: 0.12014952, a: 0}
+    scale: 0.2
+  - visualPrefab: {fileID: 0}
+    stageColor: {r: 0.7372549, g: 0.43668115, b: 0.14117646, a: 0}
+    scale: 0.4
+  - visualPrefab: {fileID: 0}
+    stageColor: {r: 1, g: 0, b: 0.1701541, a: 0}
+    scale: 0.6
   mutationChance: 0.05
   mutatesInto: {fileID: 0}
   dialogue: {fileID: 0}

@@ -33,6 +33,7 @@ public class TutorialConsole : MonoBehaviour
 
     void BuildUI()
     {
+        // Canvas found once at startup — no per-frame search
         Canvas canvas = FindFirstObjectByType<Canvas>();
 
         panel = new GameObject("TutorialConsole", typeof(RectTransform),
@@ -58,24 +59,25 @@ public class TutorialConsole : MonoBehaviour
         trt.sizeDelta        = new Vector2(-20f, -16f);
         trt.anchoredPosition = new Vector2(4f, 0f);
 
-        logText                = txtObj.GetComponent<TextMeshProUGUI>();
-        logText.fontSize       = FontBody;
-        logText.color          = Color.white;
-        logText.richText       = true;
-        logText.alignment      = TextAlignmentOptions.BottomLeft;
-        logText.overflowMode   = TextOverflowModes.Truncate;  // clip instead of grow
+        logText                  = txtObj.GetComponent<TextMeshProUGUI>();
+        logText.fontSize         = FontBody;
+        logText.color            = Color.white;
+        logText.richText         = true;
+        logText.alignment        = TextAlignmentOptions.BottomLeft;
+        logText.overflowMode     = TextOverflowModes.Truncate;
         logText.textWrappingMode = TextWrappingModes.Normal;
 
         panel.SetActive(false);
     }
 
     // ── Public API ────────────────────────────────────────────
+    // Hex constants from UIColors — no ToHex() call per log
 
     public static void Log(string message)   => Instance?.AddLine(message);
     public static void Warn(string message)  => Instance?.AddLine(
-        $"<color={UIColors.ConsoleWarning.ToHex()}>{message}</color>");
+        $"<color={UIColors.ConsoleWarning_Hex}>{message}</color>");
     public static void Error(string message) => Instance?.AddLine(
-        $"<color={UIColors.ConsoleError.ToHex()}>{message}</color>");
+        $"<color={UIColors.ConsoleError_Hex}>{message}</color>");
 
     // ── Internal ──────────────────────────────────────────────
 

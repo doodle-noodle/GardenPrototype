@@ -1,12 +1,23 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 [CreateAssetMenu(fileName = "NewPlaceable", menuName = "Garden/Placeable Data")]
-public class PlaceableData : ScriptableObject
+public class PlaceableData : ScriptableObject, IShopable
 {
+    [Header("Identity")]
     public string placeableName;
+
+    [Header("Placement")]
     public GameObject prefab;
-    public int unlockCost;
-    public Rarity rarity = Rarity.Common;  // set per placeable in Inspector
-    public int gridWidth  = 1;
-    public int gridHeight = 1;
+    public int        unlockCost;
+    public int        gridWidth  = 1;
+    public int        gridHeight = 1;
+
+    [Header("Shop")]
+    public Rarity rarity = Rarity.Common;
+
+    // ── IShopable ─────────────────────────────────────────────
+    string   IShopable.DisplayName    => placeableName;
+    int      IShopable.BasePrice      => unlockCost;
+    Rarity   IShopable.ItemRarity     => rarity;
+    ShopItem IShopable.CreateShopItem() => ShopItem.MakePlaceable(this, rarity);
 }

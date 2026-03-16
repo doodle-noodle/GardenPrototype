@@ -9,7 +9,7 @@ public class GameManager : MonoBehaviour
     public int startingCoins = 50;
 
     [Header("UI")]
-    public TextMeshProUGUI coinText;
+    [SerializeField] private TextMeshProUGUI coinText;
 
     private int coins;
 
@@ -17,22 +17,7 @@ public class GameManager : MonoBehaviour
     {
         Instance = this;
         coins    = startingCoins;
-
-        // Auto-find coinText if not assigned in Inspector
-        if (coinText == null)
-        {
-            foreach (var tmp in FindObjectsByType<TextMeshProUGUI>(FindObjectsSortMode.None))
-            {
-                if (tmp.gameObject.name.ToLower().Contains("coin"))
-                {
-                    coinText = tmp;
-                    break;
-                }
-            }
-        }
-
-        if (coinText == null)
-            Debug.LogWarning("GameManager: coinText not found. Assign it in the Inspector.");
+        ResolveCoinText();
     }
 
     void Start() => UpdateUI();
@@ -67,5 +52,24 @@ public class GameManager : MonoBehaviour
     {
         if (coinText != null)
             coinText.text = $"Coins: {coins}";
+    }
+
+    // Assign in Inspector for reliability. Auto-search is a fallback only.
+    void ResolveCoinText()
+    {
+        if (coinText != null) return;
+
+        foreach (var tmp in FindObjectsByType<TextMeshProUGUI>(FindObjectsSortMode.None))
+        {
+            if (tmp.gameObject.name.ToLower().Contains("coin"))
+            {
+                coinText = tmp;
+                Debug.LogWarning("GameManager: coinText found by name search. " +
+                    "Assign it directly in the Inspector to avoid this.");
+                return;
+            }
+        }
+
+        Debug.LogError("GameManager: coinText not found. Coin UI will not update.");
     }
 }

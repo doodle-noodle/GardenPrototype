@@ -20,9 +20,9 @@ public class DioramaCamera : MonoBehaviour
     [Header("Rotation — hold right mouse button")]
     public float rotateSpeed = 240f;
 
-    [Header("Bounds")]
-    public Vector2 panMin    = new Vector2(-2f,  -2f);
-    public Vector2 panMax    = new Vector2(14f,  14f);
+    [Header("Bounds — auto-calculated from grid, override if needed")]
+    public Vector2 panMin = new Vector2(-2f,  -2f);
+    public Vector2 panMax = new Vector2(14f,  14f);
 
     private Vector3 targetLookAt;
     private float   targetZoom;
@@ -31,30 +31,33 @@ public class DioramaCamera : MonoBehaviour
 
     void Awake()
     {
-        // Read everything from the Transform as-is — don't move the camera
+        // Auto-calculate pan bounds from grid size
+        if (GridManager.Instance != null)
+        {
+            float w = GridManager.Instance.gridWidth  * GridManager.Instance.cellSize;
+            float h = GridManager.Instance.gridHeight * GridManager.Instance.cellSize;
+            panMin  = new Vector2(-2f, -2f);
+            panMax  = new Vector2(w + 2f, h + 2f);
+        }
+
         pitch      = transform.eulerAngles.x;
         yaw        = transform.eulerAngles.y;
         targetZoom = zoomHeight;
 
-        // Derive the look-at point from where the camera is already pointing
+        // Derive look-at point from camera's current forward direction
         Ray ray = new Ray(transform.position, transform.forward);
         if (Physics.Raycast(ray, out RaycastHit hit))
         {
             targetLookAt = hit.point;
         }
+        else if (transform.forward.y < 0f)
+        {
+            float t  = -transform.position.y / transform.forward.y;
+            targetLookAt = transform.position + transform.forward * t;
+        }
         else
         {
-            // If raycast misses, project forward until y=0
-            if (transform.forward.y < 0f)
-            {
-                float t  = -transform.position.y / transform.forward.y;
-                targetLookAt = transform.position + transform.forward * t;
-            }
-            else
-            {
-                // Fallback to grid center
-                targetLookAt = GetGridCenter();
-            }
+            targetLookAt = GetGridCenter();
         }
 
         targetLookAt.y = 0f;
@@ -87,7 +90,6 @@ public class DioramaCamera : MonoBehaviour
     {
         float h = Input.GetAxisRaw("Horizontal");
         float v = Input.GetAxisRaw("Vertical");
-
         if (h == 0 && v == 0) return;
 
         Vector3 right   = Quaternion.Euler(0, yaw, 0) * Vector3.right;
@@ -102,9 +104,7 @@ public class DioramaCamera : MonoBehaviour
     void HandleRotation()
     {
         if (!Input.GetMouseButton(1)) return;
-
-        float delta = Input.GetAxis("Mouse X");
-        yaw += delta * rotateSpeed * Time.deltaTime;
+        yaw += Input.GetAxis("Mouse X") * rotateSpeed * Time.deltaTime;
     }
 
     // ── Apply position ────────────────────────────────────────
@@ -137,15 +137,12 @@ public class DioramaCamera : MonoBehaviour
     {
         if (GridManager.Instance != null)
         {
-            int   w = GridManager.Instance.gridWidth;
-            int   h = GridManager.Instance.gridHeight;
-            float c = GridManager.Instance.cellSize;
-            return new Vector3(w * c * 0.5f, 0f, h * c * 0.5f);
+            float w = GridManager.Instance.gridWidth  * GridManager.Instance.cellSize;
+            float h = GridManager.Instance.gridHeight * GridManager.Instance.cellSize;
+            return new Vector3(w * 0.5f, 0f, h * 0.5f);
         }
         return Vector3.zero;
     }
-
-    // ── Editor gizmo ─────────────────────────────────────────
 
     void OnDrawGizmos()
     {
