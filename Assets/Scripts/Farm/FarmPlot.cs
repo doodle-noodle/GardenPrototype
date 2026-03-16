@@ -114,7 +114,8 @@ public class FarmPlot : MonoBehaviour
         FloatingText.Spawn(
             $"+{harvested.SellValue}  {RankUtility.RankLabel(rank)}",
             transform.position + Vector3.up * 1.5f,
-            RankUtility.RankColor(rank));
+            UIColors.FloatingGold);
+
         Inventory.Instance.AddHarvest(harvested);
 
         TutorialConsole.Log($"Harvested {RankUtility.RankLabel(rank)} " +

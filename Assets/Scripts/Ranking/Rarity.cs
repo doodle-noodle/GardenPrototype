@@ -2,8 +2,26 @@ using UnityEngine;
 
 public enum Rarity { Common, Uncommon, Rare, Legendary, Mythical }
 
+[System.Serializable]
+public struct RarityDefinition
+{
+    public Rarity Rarity;
+    public Color  DisplayColor;
+    public string HexCode;
+    public float  PriceMultiplier;
+}
+
 public static class RarityUtility
 {
+    private static readonly RarityDefinition[] Definitions =
+    {
+        new RarityDefinition { Rarity = Rarity.Common,    DisplayColor = UIColors.RarityCommon,    HexCode = UIColors.RarityCommon_Hex,    PriceMultiplier = 1f   },
+        new RarityDefinition { Rarity = Rarity.Uncommon,  DisplayColor = UIColors.RarityUncommon,  HexCode = UIColors.RarityUncommon_Hex,  PriceMultiplier = 1.5f },
+        new RarityDefinition { Rarity = Rarity.Rare,      DisplayColor = UIColors.RarityRare,      HexCode = UIColors.RarityRare_Hex,      PriceMultiplier = 2.5f },
+        new RarityDefinition { Rarity = Rarity.Legendary, DisplayColor = UIColors.RarityLegendary, HexCode = UIColors.RarityLegendary_Hex, PriceMultiplier = 5f   },
+        new RarityDefinition { Rarity = Rarity.Mythical,  DisplayColor = UIColors.RarityMythical,  HexCode = UIColors.RarityMythical_Hex,  PriceMultiplier = 12f  },
+    };
+
     private static readonly float[] Weights = { 55f, 28f, 12f, 4f, 1f };
 
     public static Rarity RollRarity()
@@ -23,33 +41,13 @@ public static class RarityUtility
         return Rarity.Common;
     }
 
-    // Price multiplier per rarity — rarer items cost more in the shop
-    public static float PriceMultiplier(Rarity rarity) => rarity switch
-    {
-        Rarity.Common    => 1f,
-        Rarity.Uncommon  => 1.5f,
-        Rarity.Rare      => 2.5f,
-        Rarity.Legendary => 5f,
-        Rarity.Mythical  => 12f,
-        _                => 1f
-    };
+    public static RarityDefinition GetDefinition(Rarity rarity) => Definitions[(int)rarity];
+    public static Color  RarityColor(Rarity rarity)      => GetDefinition(rarity).DisplayColor;
+    public static float  PriceMultiplier(Rarity rarity)   => GetDefinition(rarity).PriceMultiplier;
 
-    public static Color RarityColor(Rarity rarity) => rarity switch
-    {
-        Rarity.Common    => Color.white,
-        Rarity.Uncommon  => new Color(0.18f, 0.8f, 0.18f),   // green
-        Rarity.Rare      => new Color(1f,    0.85f, 0f),      // yellow
-        Rarity.Legendary => new Color(1f,    0.4f,  0.8f),    // pink
-        Rarity.Mythical  => new Color(0.6f,  0.2f,  1f),      // purple
-        _                => Color.white
-    };
-
-    // Rich text label with rarity color
     public static string RarityLabel(Rarity rarity)
     {
-        Color  c     = RarityColor(rarity);
-        string hex   = ColorUtility.ToHtmlStringRGB(c);
-        string name  = rarity.ToString();
-        return $"<color=#{hex}>{name}</color>";
+        var def = GetDefinition(rarity);
+        return $"<color={def.HexCode}>{rarity}</color>";
     }
 }

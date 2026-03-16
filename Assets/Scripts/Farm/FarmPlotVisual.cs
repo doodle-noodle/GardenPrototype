@@ -1,26 +1,28 @@
 ﻿using System.Collections;
 using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
 
 [RequireComponent(typeof(FarmPlot))]
 public class FarmPlotVisual : MonoBehaviour
 {
-    private FarmPlot  plot;
+    private FarmPlot           plot;
     private FarmPlot.PlotState lastState;
-    private int       lastStage = -1;
+    private int                lastStage = -1;
 
-    private GameObject cropObject;
-    private GameObject ghostObject;
-
-    private Renderer plotRenderer;
-    private Color    defaultPlotColor;
+    private GameObject      cropObject;
+    private GameObject      ghostObject;
+    private GameObject      timerLabel;
+    private Renderer        plotRenderer;
+    private Color           defaultPlotColor;
 
     // ── Setup ─────────────────────────────────────────────────
 
     void Awake()
     {
-        plot         = GetComponent<FarmPlot>();
-        lastState    = plot.State;
-        plotRenderer = GetComponent<Renderer>();
+        plot             = GetComponent<FarmPlot>();
+        lastState        = plot.State;
+        plotRenderer     = GetComponent<Renderer>();
 
         if (plotRenderer != null)
             defaultPlotColor = plotRenderer.material.color;
@@ -37,7 +39,7 @@ public class FarmPlotVisual : MonoBehaviour
             RefreshVisual();
         }
 
-        // Pulse crop visual when ready to harvest
+        // Pulse when ready
         if (plot.State == FarmPlot.PlotState.Ready && cropObject != null)
         {
             float pulse = 1f + Mathf.Sin(Time.time * 3f) * 0.08f;
@@ -45,6 +47,9 @@ public class FarmPlotVisual : MonoBehaviour
             float s = stage.scale * pulse;
             cropObject.transform.localScale = new Vector3(s, s, s);
         }
+
+        // Update timer label text every frame while visible
+        UpdateTimerLabel();
     }
 
     // ── Hover ─────────────────────────────────────────────────
@@ -52,19 +57,28 @@ public class FarmPlotVisual : MonoBehaviour
     public void OnHoverEnter()
     {
         if (ShopUI.IsOpen) return;
-        if (plot.State != FarmPlot.PlotState.Empty) return;
-        if (Inventory.Instance.SelectedSeed == null) return;
-        if (Inventory.Instance.GetSeedCount(Inventory.Instance.SelectedSeed) <= 0) return;
 
-        if (plotRenderer != null)
-            plotRenderer.material.color = defaultPlotColor * 1.3f;
-
-        ShowGhost();
+        if (plot.State == FarmPlot.PlotState.Empty)
+        {
+            if (Inventory.Instance.SelectedSeed == null) return;
+            if (Inventory.Instance.GetSeedCount(Inventory.Instance.SelectedSeed) <= 0) return;
+            if (plotRenderer != null)
+                plotRenderer.material.color = defaultPlotColor * 1.3f;
+            ShowGhost();
+        }
+        else if (plot.State == FarmPlot.PlotState.Growing)
+        {
+            ShowTimerLabel();
+        }
     }
 
     public void OnHoverStay()
     {
-        if (ghostObject == null) OnHoverEnter();
+        if (plot.State == FarmPlot.PlotState.Empty && ghostObject == null)
+            OnHoverEnter();
+
+        if (plot.State == FarmPlot.PlotState.Growing && timerLabel == null)
+            ShowTimerLabel();
     }
 
     public void OnHoverExit()
@@ -73,6 +87,81 @@ public class FarmPlotVisual : MonoBehaviour
             plotRenderer.material.color = defaultPlotColor;
 
         HideGhost();
+        HideTimerLabel();
+    }
+
+    // ── Timer label ───────────────────────────────────────────
+
+    void ShowTimerLabel()
+    {
+        if (timerLabel != null) return;
+
+        Canvas canvas = FindFirstObjectByType<Canvas>();
+
+        timerLabel = new GameObject("TimerLabel", typeof(RectTransform),
+            typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        timerLabel.transform.SetParent(canvas.transform, false);
+
+        var tmp = timerLabel.GetComponent<TextMeshProUGUI>();
+        tmp.fontSize  = 22;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.color     = Color.white;
+
+        var rt = timerLabel.GetComponent<RectTransform>();
+        rt.sizeDelta = new Vector2(120f, 36f);
+    }
+
+    void UpdateTimerLabel()
+    {
+        if (timerLabel == null) return;
+        if (plot.State != FarmPlot.PlotState.Growing || plot.ActiveCrop == null)
+        {
+            HideTimerLabel();
+            return;
+        }
+
+        // Format time remaining
+        float remaining = plot.ActiveCrop.growthStages[plot.CurrentStage].duration - plot.StageTimer;
+        for (int i = plot.CurrentStage + 1; i < plot.ActiveCrop.growthStages.Length - 1; i++)
+            remaining += plot.ActiveCrop.growthStages[i].duration;
+
+        string timeText;
+        if (remaining >= 3600f)
+            timeText = $"{(int)(remaining / 3600f)}h";
+        else if (remaining >= 60f)
+            timeText = $"{(int)(remaining / 60f)}m";
+        else
+            timeText = $"{remaining:F1}s";
+
+        timerLabel.GetComponent<TextMeshProUGUI>().text = timeText;
+
+        // Position above the crop in world space
+        Vector3 worldPos   = transform.position + Vector3.up * 1.5f;
+        Vector3 screenPos  = Camera.main.WorldToScreenPoint(worldPos);
+
+        // Only show if in front of camera
+        if (screenPos.z < 0f)
+        {
+            timerLabel.SetActive(false);
+            return;
+        }
+
+        timerLabel.SetActive(true);
+
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            FindFirstObjectByType<Canvas>().GetComponent<RectTransform>(),
+            screenPos, null, out Vector2 localPos);
+
+        timerLabel.GetComponent<RectTransform>().anchoredPosition = localPos;
+    }
+
+    void HideTimerLabel()
+    {
+        if (timerLabel != null)
+        {
+            Destroy(timerLabel);
+            timerLabel = null;
+        }
     }
 
     // ── Ghost ─────────────────────────────────────────────────
@@ -84,8 +173,7 @@ public class FarmPlotVisual : MonoBehaviour
         CropData seed = Inventory.Instance.SelectedSeed;
         if (seed == null || seed.growthStages.Length == 0) return;
 
-        GrowthStage firstStage = seed.growthStages[0];
-        ghostObject = SpawnVisual(firstStage);
+        ghostObject = SpawnVisual(seed.growthStages[0]);
 
         if (PlacementController.GhostValid != null)
             ghostObject.GetComponent<Renderer>().material = PlacementController.GhostValid;
@@ -112,7 +200,6 @@ public class FarmPlotVisual : MonoBehaviour
         ClearCropVisual();
         cropObject = SpawnVisual(stage);
 
-        // Tint ready crops yellow
         if (plot.State == FarmPlot.PlotState.Ready)
         {
             var rend = cropObject.GetComponent<Renderer>();
@@ -120,7 +207,6 @@ public class FarmPlotVisual : MonoBehaviour
                 rend.material.color = Color.Lerp(stage.stageColor, Color.yellow, 0.4f);
         }
 
-        // Scale pop on every stage change
         StartCoroutine(ScalePop(cropObject, stage.scale));
     }
 
@@ -129,7 +215,7 @@ public class FarmPlotVisual : MonoBehaviour
         if (cropObject != null) { Destroy(cropObject); cropObject = null; }
     }
 
-    // ── Scale pop coroutine ───────────────────────────────────
+    // ── Scale pop ─────────────────────────────────────────────
 
     IEnumerator ScalePop(GameObject target, float finalScale)
     {
@@ -157,17 +243,12 @@ public class FarmPlotVisual : MonoBehaviour
 
     GameObject SpawnVisual(GrowthStage stage)
     {
-        GameObject go;
+        GameObject go = stage.visualPrefab != null
+            ? Instantiate(stage.visualPrefab)
+            : GameObject.CreatePrimitive(PrimitiveType.Sphere);
 
-        if (stage.visualPrefab != null)
-        {
-            go = Instantiate(stage.visualPrefab);
-        }
-        else
-        {
-            go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        if (stage.visualPrefab == null)
             go.GetComponent<Renderer>().material.color = stage.stageColor;
-        }
 
         go.transform.SetParent(null);
 
@@ -189,5 +270,6 @@ public class FarmPlotVisual : MonoBehaviour
     {
         if (cropObject  != null) Destroy(cropObject);
         if (ghostObject != null) Destroy(ghostObject);
+        if (timerLabel  != null) Destroy(timerLabel);
     }
 }

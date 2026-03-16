@@ -1,10 +1,28 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 
 public enum Rank { D, C, B, A, S }
 
+[System.Serializable]
+public struct RankDefinition
+{
+    public Rank   Rank;
+    public Color  DisplayColor;
+    public Color  ButtonColor;
+    public string HexCode;
+    public float  SellMultiplier;
+}
+
 public static class RankUtility
 {
-    // Probability weights for each rank — higher index = rarer
+    private static readonly RankDefinition[] Definitions =
+    {
+        new RankDefinition { Rank = Rank.D, DisplayColor = UIColors.RankD_Display, ButtonColor = UIColors.RankD_Button, HexCode = UIColors.RankD_Hex, SellMultiplier = 1f   },
+        new RankDefinition { Rank = Rank.C, DisplayColor = UIColors.RankC_Display, ButtonColor = UIColors.RankC_Button, HexCode = UIColors.RankC_Hex, SellMultiplier = 1.5f },
+        new RankDefinition { Rank = Rank.B, DisplayColor = UIColors.RankB_Display, ButtonColor = UIColors.RankB_Button, HexCode = UIColors.RankB_Hex, SellMultiplier = 2.5f },
+        new RankDefinition { Rank = Rank.A, DisplayColor = UIColors.RankA_Display, ButtonColor = UIColors.RankA_Button, HexCode = UIColors.RankA_Hex, SellMultiplier = 4f   },
+        new RankDefinition { Rank = Rank.S, DisplayColor = UIColors.RankS_Display, ButtonColor = UIColors.RankS_Button, HexCode = UIColors.RankS_Hex, SellMultiplier = 10f  },
+    };
+
     private static readonly float[] Weights = { 50f, 28f, 15f, 6f, 1f };
 
     public static Rank RollRank()
@@ -12,7 +30,7 @@ public static class RankUtility
         float total = 0f;
         foreach (var w in Weights) total += w;
 
-        float roll = Random.Range(0f, total);
+        float roll       = Random.Range(0f, total);
         float cumulative = 0f;
 
         for (int i = 0; i < Weights.Length; i++)
@@ -24,34 +42,14 @@ public static class RankUtility
         return Rank.D;
     }
 
-    // Sell value multiplier per rank
-    public static float SellMultiplier(Rank rank) => rank switch
-    {
-        Rank.D => 1f,
-        Rank.C => 1.5f,
-        Rank.B => 2.5f,
-        Rank.A => 4f,
-        Rank.S => 10f,
-        _      => 1f
-    };
+    public static RankDefinition GetDefinition(Rank rank) => Definitions[(int)rank];
+    public static Color  RankColor(Rank rank)       => GetDefinition(rank).DisplayColor;
+    public static Color  RankButtonColor(Rank rank)  => GetDefinition(rank).ButtonColor;
+    public static float  SellMultiplier(Rank rank)   => GetDefinition(rank).SellMultiplier;
 
-    public static Color RankColor(Rank rank) => rank switch
+    public static string RankLabel(Rank rank)
     {
-        Rank.D => Color.gray,
-        Rank.C => Color.white,
-        Rank.B => Color.green,
-        Rank.A => Color.blue,
-        Rank.S => Color.yellow,
-        _      => Color.white
-    };
-
-    public static string RankLabel(Rank rank) => rank switch
-    {
-        Rank.S => "<color=#FFD700>S</color>",
-        Rank.A => "<color=#6495ED>A</color>",
-        Rank.B => "<color=#32CD32>B</color>",
-        Rank.C => "<color=#FFFFFF>C</color>",
-        Rank.D => "<color=#808080>D</color>",
-        _      => "D"
-    };
+        var def = GetDefinition(rank);
+        return $"<color={def.HexCode}>{rank}</color>";
+    }
 }

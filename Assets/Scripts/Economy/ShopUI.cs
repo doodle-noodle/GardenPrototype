@@ -66,66 +66,56 @@ public class ShopUI : MonoBehaviour
         Canvas canvas = FindFirstObjectByType<Canvas>();
         shopPanel     = MakePanel(canvas.transform, new Vector2(PanelW, PanelH), "ShopPanel");
 
-        // Layout top-down using explicit y positions
         float top = PanelH * 0.5f;
 
-        // Title
         float titleH = 52f;
         MakeText(shopPanel.transform, "Shop", FontTitle,
             new Vector2(0f, top - titleH * 0.5f - Gap),
             new Vector2(PanelW - 20f, titleH));
 
-        // Refresh timer
         float timerY = top - titleH - Gap * 2f - 15f;
         refreshTimerText = MakeText(shopPanel.transform, "", FontSmall,
             new Vector2(0f, timerY),
             new Vector2(PanelW - 20f, 30f)).GetComponent<TextMeshProUGUI>();
 
-        // For Sale header
-        float buyHeaderY = timerY - 30f - Gap;
+         float buyHeaderY = timerY - 30f - Gap;
         MakeText(shopPanel.transform, "— For Sale —", FontHeader,
             new Vector2(0f, buyHeaderY),
-            new Vector2(PanelW - 20f, 36f));
+             new Vector2(PanelW - 20f, 36f));
 
-        // Buy scroll
         float buyScrollY = buyHeaderY - 36f * 0.5f - ScrollBuyH * 0.5f - Gap;
         var   stockScroll = MakeScrollArea(shopPanel.transform,
             new Vector2(0f, buyScrollY),
             new Vector2(PanelW - 20f, ScrollBuyH));
         stockContainer = stockScroll.transform.Find("Content");
-
-        // Sell Harvest header
+    
         float sellHeaderY = buyScrollY - ScrollBuyH * 0.5f - Gap - 18f;
         MakeText(shopPanel.transform, "— Sell Harvest —", FontHeader,
             new Vector2(0f, sellHeaderY),
             new Vector2(PanelW - 20f, 36f));
 
-        // Sell All button
         float sellBtnY = sellHeaderY - 36f * 0.5f - ButtonH * 0.5f - Gap * 0.5f;
         MakeButton(shopPanel.transform, "Sell All",
             new Vector2(0f, sellBtnY),
             new Vector2(160f, ButtonH),
-            new Color(0.5f, 0.35f, 0.05f), () => SellAll());
+            UIColors.ShopBtnSellAll, () => SellAll());
 
-        // Sell scroll
         float sellScrollY = sellBtnY - ButtonH * 0.5f - ScrollSellH * 0.5f - Gap * 0.5f;
         var   sellScroll  = MakeScrollArea(shopPanel.transform,
             new Vector2(0f, sellScrollY),
             new Vector2(PanelW - 20f, ScrollSellH));
         sellContainer = sellScroll.transform.Find("Content");
 
-        // Nothing to sell text (overlaps sell scroll area, hidden by default)
         var noHarvestObj = MakeText(shopPanel.transform, "Nothing to sell yet.", FontBody,
             new Vector2(0f, sellScrollY),
             new Vector2(PanelW - 20f, 36f));
-        noHarvestText = noHarvestObj.GetComponent<TextMeshProUGUI>();
+            noHarvestText = noHarvestObj.GetComponent<TextMeshProUGUI>();
 
-        // Close button at the bottom
         float closeBtnY = sellScrollY - ScrollSellH * 0.5f - ButtonH * 0.5f - Gap;
         MakeButton(shopPanel.transform, "Close",
             new Vector2(0f, closeBtnY),
             new Vector2(160f, ButtonH),
-            new Color(0.7f, 0.25f, 0.25f), () => CloseShop());
+            UIColors.ShopBtnClose, () => CloseShop());
     }
 
     // ── Show / Hide ───────────────────────────────────────────
@@ -267,15 +257,10 @@ public class ShopUI : MonoBehaviour
         RefreshSellButtons();
     }
 
-    Color ColorForRank(Rank rank) => rank switch
+    Color ColorForRank(Rank rank)
     {
-        Rank.D => new Color(0.35f, 0.35f, 0.35f),
-        Rank.C => new Color(0.35f, 0.35f, 0.55f),
-        Rank.B => new Color(0.15f, 0.45f, 0.15f),
-        Rank.A => new Color(0.15f, 0.25f, 0.60f),
-        Rank.S => new Color(0.60f, 0.50f, 0.05f),
-        _      => new Color(0.35f, 0.35f, 0.35f)
-    };
+          return RankUtility.RankButtonColor(rank);
+    }
 
     // ── UI Helpers ────────────────────────────────────────────
 
@@ -287,7 +272,7 @@ public class ShopUI : MonoBehaviour
         var rt = go.GetComponent<RectTransform>();
         rt.sizeDelta        = size;
         rt.anchoredPosition = Vector2.zero;
-        go.GetComponent<Image>().color = new Color(0.08f, 0.08f, 0.08f, 0.96f);
+        go.GetComponent<Image>().color = UIColors.ShopPanel;
         return go;
     }
 
@@ -299,7 +284,7 @@ public class ShopUI : MonoBehaviour
         var srt = scroll.GetComponent<RectTransform>();
         srt.sizeDelta        = size;
         srt.anchoredPosition = pos;
-        scroll.GetComponent<Image>().color          = new Color(0.12f, 0.12f, 0.12f, 1f);
+        scroll.GetComponent<Image>().color          = UIColors.ShopScroll;
         scroll.GetComponent<Mask>().showMaskGraphic = true;
 
         GameObject content = new GameObject("Content", typeof(RectTransform));

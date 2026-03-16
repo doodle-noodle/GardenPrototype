@@ -64,7 +64,7 @@ public class TutorialConsole : MonoBehaviour
         logText.richText       = true;
         logText.alignment      = TextAlignmentOptions.BottomLeft;
         logText.overflowMode   = TextOverflowModes.Truncate;  // clip instead of grow
-        logText.enableWordWrapping = true;
+        logText.textWrappingMode = TextWrappingModes.Normal;
 
         panel.SetActive(false);
     }
@@ -72,8 +72,10 @@ public class TutorialConsole : MonoBehaviour
     // ── Public API ────────────────────────────────────────────
 
     public static void Log(string message)   => Instance?.AddLine(message);
-    public static void Warn(string message)  => Instance?.AddLine($"<color=#FFB347>{message}</color>");
-    public static void Error(string message) => Instance?.AddLine($"<color=#FF6B6B>{message}</color>");
+    public static void Warn(string message)  => Instance?.AddLine(
+        $"<color={UIColors.ConsoleWarning.ToHex()}>{message}</color>");
+    public static void Error(string message) => Instance?.AddLine(
+        $"<color={UIColors.ConsoleError.ToHex()}>{message}</color>");
 
     // ── Internal ──────────────────────────────────────────────
 

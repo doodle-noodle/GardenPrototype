@@ -16,14 +16,14 @@ public class InventoryHotbar : MonoBehaviour
     private const float BottomPad      = 20f;
 
     // ── Colors ────────────────────────────────────────────────
-    private static readonly Color ColorEmpty    = new Color(0.12f, 0.12f, 0.12f, 1f);
-    private static readonly Color ColorSeed     = new Color(0.20f, 0.20f, 0.20f, 1f);
-    private static readonly Color ColorHarvest  = new Color(0.20f, 0.18f, 0.10f, 1f);
-    private static readonly Color ColorSelected = new Color(0.20f, 0.55f, 0.20f, 1f);
-    private static readonly Color ColorPanel    = new Color(0.08f, 0.08f, 0.08f, 0.90f);
-    private static readonly Color ColorDimText  = new Color(1f,   1f,   1f,   0.25f);
-    private static readonly Color ColorSeedTag  = new Color(0.30f, 0.80f, 0.30f, 1f);
-    private static readonly Color ColorHarvTag  = new Color(0.90f, 0.70f, 0.10f, 1f);
+    private static Color ColorEmpty    => UIColors.SlotEmpty;
+    private static Color ColorSeed     => UIColors.SlotSeed;
+    private static Color ColorHarvest  => UIColors.SlotHarvest;
+    private static Color ColorSelected => UIColors.SlotSelected;
+    private static Color ColorPanel    => UIColors.SlotPanel;
+    private static Color ColorDimText  => UIColors.TextDim;
+    private static Color ColorSeedTag  => UIColors.TagSeed;
+    private static Color ColorHarvTag  => UIColors.TagHarvest;
 
     // ── Slot sub-elements ─────────────────────────────────────
     private struct SlotElements

@@ -14,7 +14,7 @@ public class FloatingText : MonoBehaviour
 
         var tmp = go.GetComponent<TextMeshProUGUI>();
         tmp.text      = text;
-        tmp.fontSize  = 18;
+        tmp.fontSize  = 36;
         tmp.fontStyle = FontStyles.Bold;
         tmp.color     = color;
         tmp.richText  = true;
