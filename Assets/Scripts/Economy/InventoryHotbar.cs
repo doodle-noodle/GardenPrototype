@@ -14,6 +14,7 @@ public class InventoryHotbar : MonoBehaviour
     private const float SlotSpacing  = 6f;
     private const float PanelPadding = 10f;
     private const float BottomPad    = 20f;
+    private const float MaxWidthPct  = 0.9f;  // hotbar never exceeds 90% of screen width
 
     // ── Slot sub-elements ─────────────────────────────────────
     private struct SlotElements
@@ -87,8 +88,18 @@ public class InventoryHotbar : MonoBehaviour
     {
         Canvas canvas = FindFirstObjectByType<Canvas>();
         int    count  = Inventory.MaxSlots;
-        float  panelW = count * SlotW + (count - 1) * SlotSpacing + PanelPadding * 2f;
-        float  panelH = SlotH + PanelPadding * 2f;
+
+        // Scale slots down if they would overflow the screen width
+        float totalFixed  = count * SlotW + (count - 1) * SlotSpacing + PanelPadding * 2f;
+        float maxWidth    = Screen.width * MaxWidthPct;
+        float scaleFactor = totalFixed > maxWidth ? maxWidth / totalFixed : 1f;
+        float slotW       = SlotW * scaleFactor;
+        float slotH       = SlotH * scaleFactor;
+        int   bodyFont    = Mathf.Max(10, Mathf.RoundToInt(FontBody  * scaleFactor));
+        int   labelFont   = Mathf.Max(8,  Mathf.RoundToInt(FontLabel * scaleFactor));
+
+        float panelW = count * slotW + (count - 1) * SlotSpacing + PanelPadding * 2f;
+        float panelH = slotH + PanelPadding * 2f;
 
         GameObject panel = new GameObject("InventoryHotbar", typeof(RectTransform),
             typeof(CanvasRenderer), typeof(Image));
@@ -106,13 +117,15 @@ public class InventoryHotbar : MonoBehaviour
 
         for (int i = 0; i < count; i++)
         {
-            float xPos = -((count - 1) * (SlotW + SlotSpacing) * 0.5f)
-                         + i * (SlotW + SlotSpacing);
-            slotElements[i] = BuildSlot(panel.transform, i, xPos);
+            float xPos = -((count - 1) * (slotW + SlotSpacing) * 0.5f)
+                         + i * (slotW + SlotSpacing);
+            slotElements[i] = BuildSlot(panel.transform, i, xPos, slotW, slotH,
+                bodyFont, labelFont);
         }
     }
 
-    SlotElements BuildSlot(Transform parent, int index, float xPos)
+    SlotElements BuildSlot(Transform parent, int index, float xPos,
+        float slotW, float slotH, int bodyFont, int labelFont)
     {
         GameObject root = new GameObject($"Slot_{index + 1}", typeof(RectTransform),
             typeof(CanvasRenderer), typeof(Image), typeof(Button));
@@ -122,18 +135,18 @@ public class InventoryHotbar : MonoBehaviour
         srt.anchorMin        = new Vector2(0.5f, 0.5f);
         srt.anchorMax        = new Vector2(0.5f, 0.5f);
         srt.pivot            = new Vector2(0.5f, 0.5f);
-        srt.sizeDelta        = new Vector2(SlotW, SlotH);
+        srt.sizeDelta        = new Vector2(slotW, slotH);
         srt.anchoredPosition = new Vector2(xPos, 0f);
 
         var mainLabel = MakeLabel(root.transform, "MainLabel",
             new Vector2(0f, 4f), new Vector2(-4f, -20f),
-            FontBody, TextAlignmentOptions.Center);
+            bodyFont, TextAlignmentOptions.Center);
         mainLabel.text  = $"[{index + 1}]";
         mainLabel.color = UIColors.TextDim;
 
         var typeLabel = MakeLabel(root.transform, "TypeLabel",
-            new Vector2(0f, -SlotH * 0.5f + 10f), new Vector2(-4f, 18f),
-            FontLabel, TextAlignmentOptions.Center);
+            new Vector2(0f, -slotH * 0.5f + 10f), new Vector2(-4f, 18f),
+            labelFont, TextAlignmentOptions.Center);
         typeLabel.color = UIColors.TextDim;
 
         return new SlotElements

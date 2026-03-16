@@ -16,12 +16,12 @@ public class ShopUI : MonoBehaviour
 
     // ── Panel layout ──────────────────────────────────────────
     private const float PanelW      = 560f;
-    private const float PanelH      = 880f;
+    private const float PanelH      = 780f;
     private const float ButtonW     = 520f;
-    private const float ButtonH     = 60f;
-    private const float ScrollBuyH  = 280f;
-    private const float ScrollSellH = 180f;
-    private const float Gap         = 16f;
+    private const float ButtonH     = 54f;
+    private const float ScrollBuyH  = 220f;
+    private const float ScrollSellH = 150f;
+    private const float Gap         = 12f;
 
     // ── References ────────────────────────────────────────────
     public PlaceableData farmPlotPlaceable;
@@ -63,8 +63,15 @@ public class ShopUI : MonoBehaviour
 
     void BuildShopUI()
     {
-        Canvas canvas = FindFirstObjectByType<Canvas>();
-        shopPanel     = MakePanel(canvas.transform, new Vector2(PanelW, PanelH), "ShopPanel");
+         Canvas canvas = FindFirstObjectByType<Canvas>();
+
+        // Outer panel — anchored to center, sized relative to screen
+        shopPanel = MakePanel(canvas.transform, new Vector2(PanelW, PanelH), "ShopPanel");
+
+        var shopRt = shopPanel.GetComponent<RectTransform>();
+        shopRt.anchorMin = new Vector2(0.5f, 0.5f);
+        shopRt.anchorMax = new Vector2(0.5f, 0.5f);
+        shopRt.pivot     = new Vector2(0.5f, 0.5f);
 
         float top = PanelH * 0.5f;
 
@@ -78,19 +85,19 @@ public class ShopUI : MonoBehaviour
             new Vector2(0f, timerY),
             new Vector2(PanelW - 20f, 30f)).GetComponent<TextMeshProUGUI>();
 
-         float buyHeaderY = timerY - 30f - Gap;
-        MakeText(shopPanel.transform, "Buy", FontHeader,
+        float buyHeaderY = timerY - 30f - Gap;
+        MakeText(shopPanel.transform, "— Buy —", FontHeader,
             new Vector2(0f, buyHeaderY),
-             new Vector2(PanelW - 20f, 36f));
+            new Vector2(PanelW - 20f, 36f));
 
         float buyScrollY = buyHeaderY - 36f * 0.5f - ScrollBuyH * 0.5f - Gap;
         var   stockScroll = MakeScrollArea(shopPanel.transform,
             new Vector2(0f, buyScrollY),
             new Vector2(PanelW - 20f, ScrollBuyH));
         stockContainer = stockScroll.transform.Find("Content");
-    
+
         float sellHeaderY = buyScrollY - ScrollBuyH * 0.5f - Gap - 18f;
-        MakeText(shopPanel.transform, "Sell", FontHeader,
+        MakeText(shopPanel.transform, "— Sell —", FontHeader,
             new Vector2(0f, sellHeaderY),
             new Vector2(PanelW - 20f, 36f));
 
@@ -109,13 +116,14 @@ public class ShopUI : MonoBehaviour
         var noHarvestObj = MakeText(shopPanel.transform, "Nothing to sell yet.", FontBody,
             new Vector2(0f, sellScrollY),
             new Vector2(PanelW - 20f, 36f));
-            noHarvestText = noHarvestObj.GetComponent<TextMeshProUGUI>();
+        noHarvestText = noHarvestObj.GetComponent<TextMeshProUGUI>();
 
         float closeBtnY = sellScrollY - ScrollSellH * 0.5f - ButtonH * 0.5f - Gap;
         MakeButton(shopPanel.transform, "Close",
             new Vector2(0f, closeBtnY),
             new Vector2(160f, ButtonH),
-            UIColors.ShopBtnClose, () => CloseShop());
+            UIColors.ShopBtnClose, () => CloseShop());   
+        
     }
 
     // ── Show / Hide ───────────────────────────────────────────
