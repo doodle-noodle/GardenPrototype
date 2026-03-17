@@ -40,8 +40,6 @@ public class ShopUI : MonoBehaviour
 
     // ── Hold-to-buy state ─────────────────────────────────────
     private ShopItem  _heldItem;
-    private float     _holdTimer      = 0f;
-    private float     _holdAccumTime  = 0f;
     private bool      _holdActive     = false;
     private Coroutine _holdCoroutine;
 
@@ -148,11 +146,13 @@ public class ShopUI : MonoBehaviour
             BuildStockButtons();
             RefreshSellButtons();
             EventBus.Raise_ShopOpened();
+            AudioManager.Play(SoundEvent.ShopOpened);
         }
         else
         {
             StopHold();
             EventBus.Raise_ShopClosed();
+            AudioManager.Play(SoundEvent.ShopClosed);
         }
     }
 
@@ -163,6 +163,7 @@ public class ShopUI : MonoBehaviour
         shopPanel.SetActive(false);
         StopHold();
         EventBus.Raise_ShopClosed();
+        AudioManager.Play(SoundEvent.ShopClosed);
     }
 
     void OnStockRefreshed()

@@ -766,7 +766,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 6928ba6c60774e247a2dedebd5b70b18, type: 2}
+  - {fileID: 2100000, guid: 3a669952ac5a2be48ac22d0b86c4f1fe, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1367,8 +1367,8 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5b2b485b35b64e84a8c3f4da5d2b467c, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::EffectsManager
-  vfxDatabase: {fileID: 11400000, guid: 8e799aebba5902a4595d2a30ebab6eae, type: 2}
+  m_EditorClassIdentifier: Assembly-CSharp::VFXManager
+  db: {fileID: 11400000, guid: c0134fc1aa144054f872523604f0b776, type: 2}
   basePlantMaterial: {fileID: 2100000, guid: 1fbf4005550ef5c41b1dbd762c2c9f4b, type: 2}
 --- !u!1 &1403890286
 GameObject:

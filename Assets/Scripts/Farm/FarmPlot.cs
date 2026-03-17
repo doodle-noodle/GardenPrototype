@@ -15,6 +15,12 @@ public class FarmPlot : MonoBehaviour
     public int GridX { get; set; }
     public int GridZ { get; set; }
 
+    // ── Cached references ─────────────────────────────────────
+    private FarmPlotVisual _visual;
+
+    // ── Hover state ───────────────────────────────────────────
+    private bool _hasTriedPlantingThisHover = false;
+
     // ── Static placement cooldown ─────────────────────────────
     private static float _placementCooldownUntil = 0f;
 
@@ -26,8 +32,12 @@ public class FarmPlot : MonoBehaviour
     private static bool PlacementCooldownActive =>
         Time.time < _placementCooldownUntil;
 
-    // ── Hover state ───────────────────────────────────────────
-    private bool _hasTriedPlantingThisHover = false;
+    // ── Setup ─────────────────────────────────────────────────
+
+    void Awake()
+    {
+        _visual = GetComponent<FarmPlotVisual>();
+    }
 
     // ── Growing ───────────────────────────────────────────────
 
@@ -70,13 +80,13 @@ public class FarmPlot : MonoBehaviour
     void OnMouseEnter()
     {
         _hasTriedPlantingThisHover = false;
-        GetComponent<FarmPlotVisual>()?.OnHoverEnter();
+        _visual?.OnHoverEnter();
     }
 
     void OnMouseExit()
     {
         _hasTriedPlantingThisHover = false;
-        GetComponent<FarmPlotVisual>()?.OnHoverExit();
+        _visual?.OnHoverExit();
     }
 
     void OnMouseOver()
@@ -84,19 +94,17 @@ public class FarmPlot : MonoBehaviour
         if (PlacementController.Instance != null && PlacementController.Instance.IsPlacing) return;
         if (PlacementCooldownActive) return;
 
-        GetComponent<FarmPlotVisual>()?.OnHoverStay();
+        _visual?.OnHoverStay();
 
         if (ShopUI.IsOpen) return;
         if (Inventory.Instance.SelectedSlot?.Type == InventoryItemType.Tool) return;
 
-        // Reset flag when mouse button is released
         if (Input.GetMouseButtonUp(0))
         {
             _hasTriedPlantingThisHover = false;
             return;
         }
 
-        // Hold to plant — fires once per plot per mouse press
         if (Input.GetMouseButton(0) && State == PlotState.Empty && !_hasTriedPlantingThisHover)
         {
             _hasTriedPlantingThisHover = true;
@@ -122,7 +130,7 @@ public class FarmPlot : MonoBehaviour
                 break;
             case PlotState.Ready:
                 Harvest();
-                 _hasTriedPlantingThisHover = true;
+                _hasTriedPlantingThisHover = true;
                 break;
             case PlotState.Growing:
                 float remaining = ActiveCrop.growthStages[CurrentStage].duration - StageTimer;
@@ -162,6 +170,9 @@ public class FarmPlot : MonoBehaviour
         AudioManager.Play(SoundEvent.SeedPlanted);
         TutorialConsole.Log($"Planted {ActiveCrop.cropName}!");
         EventBus.Raise_PlotPlanted(this);
+
+        // Trigger burial animation — visual delays showing crop until it completes
+        _visual?.PlayBurialAnimation(ActiveCrop);
     }
 
     // ── Harvesting ────────────────────────────────────────────
@@ -191,10 +202,7 @@ public class FarmPlot : MonoBehaviour
         TutorialConsole.Log($"Harvested {RankUtility.RankLabel(result.Rank)} " +
             $"{result.DisplayName} — worth {result.SellValue} coins.");
 
-        // Prevent OnMouseOver from immediately trying to plant on the
-        // newly emptied plot while the mouse button is still held
         _hasTriedPlantingThisHover = true;
-
         ResetState();
     }
 
@@ -204,7 +212,7 @@ public class FarmPlot : MonoBehaviour
     {
         GridManager.Instance.ClearCells(GridX, GridZ, 1, 1);
         EventBus.Raise_PlotRemoved(this);
-        GetComponent<FarmPlotVisual>()?.ForceCleanup();
+        _visual?.ForceCleanup();
         Destroy(gameObject);
     }
 

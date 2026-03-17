@@ -34,7 +34,7 @@ MonoBehaviour:
     Volume: 0.5
     PitchVariance: 1.05
   - Event: 5
-    Clip: {fileID: 0}
+    Clip: {fileID: 8300000, guid: e9ef71a800f23fa4dbf1adabd73e3ca6, type: 3}
     Volume: 0.4
     PitchVariance: 1.05
   - Event: 6

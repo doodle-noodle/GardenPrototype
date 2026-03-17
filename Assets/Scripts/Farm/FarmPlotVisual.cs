@@ -19,6 +19,8 @@ public class FarmPlotVisual : MonoBehaviour
     private Camera _mainCamera;
     private Canvas _canvas;
 
+    private bool _burialAnimPlaying = false;
+
     // ── Setup ─────────────────────────────────────────────────
 
     void Awake()
@@ -44,7 +46,6 @@ public class FarmPlotVisual : MonoBehaviour
             RefreshVisual();
         }
 
-        // Pulse scale when ready to harvest
         if (plot.State == FarmPlot.PlotState.Ready && cropObject != null)
         {
             GrowthStageVisual visual = GetStageVisual(plot.ActiveCrop, plot.CurrentStage);
@@ -92,6 +93,24 @@ public class FarmPlotVisual : MonoBehaviour
         HideTimerLabel();
     }
 
+    // ── Burial animation ──────────────────────────────────────
+
+    public void PlayBurialAnimation(CropData crop)
+    {
+        GrowthStageVisual stageVisual = GetStageVisual(crop, 0);
+        _burialAnimPlaying = true;
+
+        VFXManager.PlayBurial(
+            transform.position,
+            transform.lossyScale.y * 0.5f,
+            stageVisual,
+            onComplete: () =>
+            {
+                _burialAnimPlaying = false;
+                RefreshVisual();
+            });
+    }
+
     // ── Timer label ───────────────────────────────────────────
 
     void ShowTimerLabel()
@@ -119,7 +138,6 @@ public class FarmPlotVisual : MonoBehaviour
             return;
         }
 
-        // Total time remaining across all remaining stages
         float remaining = plot.ActiveCrop.growthStages[plot.CurrentStage].duration
                           - plot.StageTimer;
         for (int i = plot.CurrentStage + 1; i < plot.ActiveCrop.growthStages.Length - 1; i++)
@@ -178,6 +196,8 @@ public class FarmPlotVisual : MonoBehaviour
             return;
         }
 
+        if (_burialAnimPlaying) return;
+
         if (plot.ActiveCrop == null || plot.CurrentStage < 0) return;
 
         GrowthStageVisual visual = GetStageVisual(plot.ActiveCrop, plot.CurrentStage);
@@ -186,19 +206,11 @@ public class FarmPlotVisual : MonoBehaviour
 
         if (plot.State == FarmPlot.PlotState.Ready)
         {
-            var rend = cropObject.GetComponent<Renderer>();
-            if (rend != null)
-            {
-                rend.material.color = Color.Lerp(visual.stageColor, Color.yellow, 0.4f);
-                VFXManager.StartGlow(VFXEvent.PlantReady, rend);
-            }
+            // Color tinting disabled — preserves real model materials
+            // Re-enable when a proper highlight/outline system is added
         }
         else
         {
-            Vector3 plotTop  = transform.position
-                               + Vector3.up * (transform.lossyScale.y * 0.5f);
-            Vector3 finalPos = plotTop + Vector3.up * (visual.scale * 0.5f);
-            VFXManager.PlayDropAnim(VFXEvent.SeedPlanted, cropObject, finalPos);
             StartCoroutine(ScalePop(cropObject, visual.scale));
         }
     }
@@ -256,13 +268,16 @@ public class FarmPlotVisual : MonoBehaviour
         foreach (var col in go.GetComponentsInChildren<Collider>())
             Destroy(col);
 
-        float   s        = visual.scale;
-        Vector3 plotTop  = transform.position
-                           + Vector3.up * (transform.lossyScale.y * 0.5f);
-        Vector3 finalPos = plotTop + Vector3.up * (s * 0.5f);
+        float   s       = visual.scale;
+        Vector3 plotTop = transform.position
+                          + Vector3.up * (transform.lossyScale.y * 0.5f);
 
         go.transform.localScale = new Vector3(s, s, s);
-        go.transform.position   = finalPos;
+
+        // Prefab origin sits on plot surface — sphere needs radius offset
+        go.transform.position = visual.visualPrefab != null
+            ? plotTop
+            : plotTop + Vector3.up * (s * 0.5f);
 
         if (visual.visualPrefab == null)
         {
@@ -275,6 +290,7 @@ public class FarmPlotVisual : MonoBehaviour
 
     public void ForceCleanup()
     {
+        _burialAnimPlaying = false;
         ClearCropVisual();
         HideGhost();
         HideTimerLabel();
