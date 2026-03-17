@@ -15,6 +15,17 @@ public class FarmPlot : MonoBehaviour
     public int GridX { get; set; }
     public int GridZ { get; set; }
 
+    // ── Static placement cooldown ─────────────────────────────
+    private static float _placementCooldownUntil = 0f;
+
+    public static void SetPlacementCooldown(float duration = 0.15f)
+    {
+        _placementCooldownUntil = Time.time + duration;
+    }
+
+    private static bool PlacementCooldownActive =>
+        Time.time < _placementCooldownUntil;
+
     // ── Hover state ───────────────────────────────────────────
     private bool _hasTriedPlantingThisHover = false;
 
@@ -71,6 +82,7 @@ public class FarmPlot : MonoBehaviour
     void OnMouseOver()
     {
         if (PlacementController.Instance != null && PlacementController.Instance.IsPlacing) return;
+        if (PlacementCooldownActive) return;
 
         GetComponent<FarmPlotVisual>()?.OnHoverStay();
 
@@ -95,6 +107,7 @@ public class FarmPlot : MonoBehaviour
     void OnMouseDown()
     {
         if (PlacementController.Instance != null && PlacementController.Instance.IsPlacing) return;
+        if (PlacementCooldownActive) return;
         if (ShopUI.IsOpen) return;
         if (Inventory.Instance.SelectedSlot?.Type == InventoryItemType.Tool) return;
         HandleClick();

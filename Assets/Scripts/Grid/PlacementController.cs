@@ -174,6 +174,7 @@ public class PlacementController : MonoBehaviour
 
         TutorialConsole.Log($"{currentData.placeableName} placed!");
         AudioManager.Play(SoundEvent.PlotPlaced);
+        FarmPlot.SetPlacementCooldown(0.25f);
 
         // Fully destroy ghost before continuing
         Destroy(ghostObject);
@@ -186,10 +187,9 @@ public class PlacementController : MonoBehaviour
 
         if (GameManager.Instance.CanAfford(justPlaced.unlockCost))
         {
+            FarmPlot.SetPlacementCooldown(0.25f);
             BeginPlacement(justPlaced, paid: false);
 
-            // BeginPlacement resets _lastPlaced to -1 which would allow
-            // the same cell to fire again immediately — restore saved coords
             _lastPlacedX = savedX;
             _lastPlacedZ = savedZ;
         }

@@ -1,6 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using TMPro;
 
 public class ShopUI : MonoBehaviour
@@ -16,15 +18,18 @@ public class ShopUI : MonoBehaviour
 
     // ── Panel layout ──────────────────────────────────────────
     private const float PanelW      = 560f;
-    private const float PanelH      = 780f;
+    private const float PanelH      = 880f;
     private const float ButtonW     = 520f;
-    private const float ButtonH     = 54f;
-    private const float ScrollBuyH  = 220f;
-    private const float ScrollSellH = 150f;
-    private const float Gap         = 12f;
+    private const float ButtonH     = 60f;
+    private const float ScrollBuyH  = 280f;
+    private const float ScrollSellH = 180f;
+    private const float Gap         = 16f;
 
-    // ── References ────────────────────────────────────────────
-    public PlaceableData farmPlotPlaceable;
+    // ── Hold-to-buy settings ──────────────────────────────────
+    private const float HoldInitialDelay  = 0.4f;   // seconds before repeat starts
+    private const float HoldRepeatMin     = 0.15f;  // slowest repeat interval
+    private const float HoldRepeatMax     = 0.02f;  // fastest repeat interval
+    private const float HoldAccelDuration = 3f;     // seconds to reach max speed
 
     private GameObject      shopPanel;
     private Transform       stockContainer;
@@ -32,6 +37,13 @@ public class ShopUI : MonoBehaviour
     private TextMeshProUGUI noHarvestText;
     private TextMeshProUGUI refreshTimerText;
     private bool            isOpen = false;
+
+    // ── Hold-to-buy state ─────────────────────────────────────
+    private ShopItem  _heldItem;
+    private float     _holdTimer      = 0f;
+    private float     _holdAccumTime  = 0f;
+    private bool      _holdActive     = false;
+    private Coroutine _holdCoroutine;
 
     // ── Lifecycle ─────────────────────────────────────────────
 
@@ -63,19 +75,17 @@ public class ShopUI : MonoBehaviour
 
     void BuildShopUI()
     {
-         Canvas canvas = FindFirstObjectByType<Canvas>();
-
-        // Outer panel — anchored to center, sized relative to screen
-        shopPanel = MakePanel(canvas.transform, new Vector2(PanelW, PanelH), "ShopPanel");
+        Canvas canvas = FindFirstObjectByType<Canvas>();
+        shopPanel     = MakePanel(canvas.transform, new Vector2(PanelW, PanelH), "ShopPanel");
 
         var shopRt = shopPanel.GetComponent<RectTransform>();
         shopRt.anchorMin = new Vector2(0.5f, 0.5f);
         shopRt.anchorMax = new Vector2(0.5f, 0.5f);
         shopRt.pivot     = new Vector2(0.5f, 0.5f);
 
-        float top = PanelH * 0.5f;
-
+        float top    = PanelH * 0.5f;
         float titleH = 52f;
+
         MakeText(shopPanel.transform, "Shop", FontTitle,
             new Vector2(0f, top - titleH * 0.5f - Gap),
             new Vector2(PanelW - 20f, titleH));
@@ -122,8 +132,7 @@ public class ShopUI : MonoBehaviour
         MakeButton(shopPanel.transform, "Close",
             new Vector2(0f, closeBtnY),
             new Vector2(160f, ButtonH),
-            UIColors.ShopBtnClose, () => CloseShop());   
-        
+            UIColors.ShopBtnClose, () => CloseShop());
     }
 
     // ── Show / Hide ───────────────────────────────────────────
@@ -133,8 +142,6 @@ public class ShopUI : MonoBehaviour
         isOpen = !isOpen;
         IsOpen = isOpen;
         shopPanel.SetActive(isOpen);
-        AudioManager.Play(SoundEvent.ShopOpened);
-
 
         if (isOpen)
         {
@@ -144,6 +151,7 @@ public class ShopUI : MonoBehaviour
         }
         else
         {
+            StopHold();
             EventBus.Raise_ShopClosed();
         }
     }
@@ -153,8 +161,8 @@ public class ShopUI : MonoBehaviour
         isOpen = false;
         IsOpen = false;
         shopPanel.SetActive(false);
+        StopHold();
         EventBus.Raise_ShopClosed();
-        AudioManager.Play(SoundEvent.ShopClosed);
     }
 
     void OnStockRefreshed()
@@ -175,10 +183,73 @@ public class ShopUI : MonoBehaviour
             Color    btnColor = RarityUtility.RarityColor(item.Rarity) * 0.55f;
             btnColor.a = 1f;
 
-            MakeButton(stockContainer,
+            GameObject btn = MakeButton(stockContainer,
                 $"{item.DisplayName}  —  {item.Price} coins",
                 Vector2.zero, new Vector2(ButtonW, ButtonH),
                 btnColor, () => BuyItem(captured));
+
+            // Add hold-to-buy only for consumable items (seeds)
+            // Non-consumable items like tools and placeables use single click only
+            if (item.Type == ShopItem.ItemType.Seed)
+                AddHoldToBuy(btn, captured);
+        }
+    }
+
+    // Attaches pointer down/up events for hold-to-buy behaviour
+    void AddHoldToBuy(GameObject btn, ShopItem item)
+    {
+        var trigger = btn.AddComponent<EventTrigger>();
+
+        var pointerDown = new EventTrigger.Entry { eventID = EventTriggerType.PointerDown };
+        pointerDown.callback.AddListener(_ => StartHold(item));
+        trigger.triggers.Add(pointerDown);
+
+        var pointerUp = new EventTrigger.Entry { eventID = EventTriggerType.PointerUp };
+        pointerUp.callback.AddListener(_ => StopHold());
+        trigger.triggers.Add(pointerUp);
+
+        var pointerExit = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
+        pointerExit.callback.AddListener(_ => StopHold());
+        trigger.triggers.Add(pointerExit);
+    }
+
+    void StartHold(ShopItem item)
+    {
+        StopHold();
+        _heldItem      = item;
+        _holdActive    = true;
+        _holdCoroutine = StartCoroutine(HoldBuyRoutine());
+    }
+
+    void StopHold()
+    {
+        _holdActive = false;
+        _heldItem   = null;
+        if (_holdCoroutine != null)
+        {
+            StopCoroutine(_holdCoroutine);
+            _holdCoroutine = null;
+        }
+    }
+
+    IEnumerator HoldBuyRoutine()
+    {
+        // Initial delay before repeat starts
+        yield return new WaitForSeconds(HoldInitialDelay);
+
+        float holdTime = 0f;
+
+        while (_holdActive && _heldItem != null)
+        {
+            BuyItem(_heldItem);
+
+            holdTime += HoldRepeatMin;
+
+            // Gradually decrease interval as hold time increases
+            float t        = Mathf.Clamp01(holdTime / HoldAccelDuration);
+            float interval = Mathf.Lerp(HoldRepeatMin, HoldRepeatMax, t);
+
+            yield return new WaitForSeconds(interval);
         }
     }
 
@@ -191,25 +262,24 @@ public class ShopUI : MonoBehaviour
             case ShopItem.ItemType.Seed:
                 Inventory.Instance.AddSeed(item.Crop);
                 TutorialConsole.Log($"Bought {RarityUtility.RarityLabel(item.Rarity)} " +
-                    $"{item.Crop.cropName} seed. Click a farm plot to plant it.");
-                    AudioManager.Play(SoundEvent.ItemBought);
+                    $"{item.Crop.cropName} seed.");
+                AudioManager.Play(SoundEvent.ItemBought);
                 break;
             case ShopItem.ItemType.Placeable:
                 PlacementController.Instance.BeginPlacement(item.Placeable, paid: true);
                 TutorialConsole.Log($"Click the grid to place your " +
                     $"{item.Placeable.placeableName}. Press Escape to cancel.");
-                    AudioManager.Play(SoundEvent.ItemBought);
+                AudioManager.Play(SoundEvent.ItemBought);
                 CloseShop();
                 break;
             case ShopItem.ItemType.Tool:
                 Inventory.Instance.AddTool(item.Tool);
                 TutorialConsole.Log($"Bought {RarityUtility.RarityLabel(item.Rarity)} " +
-                    $"{item.Tool.toolName}. Select it from your inventory to use it.");
-                    AudioManager.Play(SoundEvent.ItemBought);
+                    $"{item.Tool.toolName}.");
+                AudioManager.Play(SoundEvent.ItemBought);
                 break;
         }
     }
-        
 
     // ── Sell ──────────────────────────────────────────────────
 
@@ -225,9 +295,9 @@ public class ShopUI : MonoBehaviour
             if (kvp.Value.Count == 0) continue;
             hasItems = true;
 
-            var captured = kvp.Value;
-            var sample   = kvp.Value[0];
-            int total    = 0;
+            var    captured = kvp.Value;
+            var    sample   = kvp.Value[0];
+            int    total    = 0;
             foreach (var h in captured) total += h.SellValue;
 
             string label = $"Sell {sample.DisplayName} " +
@@ -249,10 +319,10 @@ public class ShopUI : MonoBehaviour
         foreach (var crop in new List<HarvestedCrop>(group))
         {
             GameManager.Instance.AddCoins(crop.SellValue);
-            AudioManager.Play(SoundEvent.ItemSold);
             Inventory.Instance.RemoveHarvest(crop);
             EventBus.Raise_CropSold(crop);
         }
+        AudioManager.Play(SoundEvent.ItemSold);
         RefreshSellButtons();
     }
 
@@ -281,7 +351,7 @@ public class ShopUI : MonoBehaviour
 
     Color ColorForRank(Rank rank)
     {
-          return RankUtility.RankButtonColor(rank);
+        return RankUtility.RankButtonColor(rank);
     }
 
     // ── UI Helpers ────────────────────────────────────────────

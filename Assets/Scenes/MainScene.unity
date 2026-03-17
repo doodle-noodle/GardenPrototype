@@ -1187,7 +1187,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1b959e0c11d15954c88029f8c0234af1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShopUI
-  farmPlotPlaceable: {fileID: 11400000, guid: 21050113fe85bd540bf8dc9754645290, type: 2}
 --- !u!1 &1359335658
 GameObject:
   m_ObjectHideFlags: 0
@@ -1369,7 +1368,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5b2b485b35b64e84a8c3f4da5d2b467c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EffectsManager
-  effectsDatabase: {fileID: 11400000, guid: 8e799aebba5902a4595d2a30ebab6eae, type: 2}
+  vfxDatabase: {fileID: 11400000, guid: 8e799aebba5902a4595d2a30ebab6eae, type: 2}
   basePlantMaterial: {fileID: 2100000, guid: 1fbf4005550ef5c41b1dbd762c2c9f4b, type: 2}
 --- !u!1 &1403890286
 GameObject:
@@ -2121,7 +2120,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2017363456}
-  - component: {fileID: 2017363455}
   - component: {fileID: 2017363458}
   - component: {fileID: 2017363457}
   m_Layer: 0
@@ -2131,20 +2129,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &2017363455
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2017363454}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b47d2cc1d11a02e49829c64e97209038, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GameManager
-  startingCoins: 50
-  coinText: {fileID: 1359335661}
 --- !u!4 &2017363456
 Transform:
   m_ObjectHideFlags: 0
@@ -2188,7 +2172,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b47d2cc1d11a02e49829c64e97209038, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameManager
-  startingCoins: 50
+  startingCoins: 9999
   coinText: {fileID: 1359335661}
 --- !u!1 &2109553477
 GameObject:
