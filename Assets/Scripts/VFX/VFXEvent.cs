@@ -1,4 +1,4 @@
-public enum EffectEvent
+public enum VFXEvent
 {
     SeedPlanted,
     SeedHarvested,

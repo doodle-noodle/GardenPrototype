@@ -1,10 +1,11 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class ToolUser : MonoBehaviour
 {
     public static ToolUser Instance;
 
-    private Camera _mainCamera;
+    private Camera   _mainCamera;
+    private Collider _lastHitCollider;
 
     void Awake()
     {
@@ -15,7 +16,16 @@ public class ToolUser : MonoBehaviour
     void Update()
     {
         if (ShopUI.IsOpen) return;
-        if (!Input.GetMouseButtonDown(0)) return;
+
+        // Reset last hit when mouse button is released
+        if (Input.GetMouseButtonUp(0))
+        {
+            _lastHitCollider = null;
+            return;
+        }
+
+        if (!Input.GetMouseButton(0)) return;
+
         if (UnityEngine.EventSystems.EventSystem.current != null &&
             UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject()) return;
 
@@ -25,9 +35,13 @@ public class ToolUser : MonoBehaviour
         Ray ray = _mainCamera.ScreenPointToRay(Input.mousePosition);
         if (!Physics.Raycast(ray, out RaycastHit hit, 200f)) return;
 
+        // Don't re-trigger on the same collider without moving away
+        if (hit.collider == _lastHitCollider) return;
+
         FarmPlot plot = hit.collider.GetComponent<FarmPlot>();
         if (plot == null) return;
 
+        _lastHitCollider = hit.collider;
         UseTool(selected.Tool, plot);
     }
 
@@ -40,7 +54,6 @@ public class ToolUser : MonoBehaviour
                 break;
         }
 
-        // Only consume if marked consumable in the Inspector
         if (tool.isConsumable)
             Inventory.Instance.UseTool(tool);
     }

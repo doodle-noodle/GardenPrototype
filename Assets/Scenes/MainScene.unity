@@ -1336,7 +1336,7 @@ GameObject:
   - component: {fileID: 1373899499}
   - component: {fileID: 1373899500}
   m_Layer: 0
-  m_Name: EffectsManager
+  m_Name: VFXManager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

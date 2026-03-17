@@ -25,6 +25,9 @@ public class PlacementController : MonoBehaviour
     private int           framesToSkip    = 0;
     private Camera        mainCamera;
 
+    private int _lastPlacedX = -1;
+    private int _lastPlacedZ = -1;
+
     public bool IsPlacing => isPlacing;
 
     // ── Setup ─────────────────────────────────────────────────
@@ -42,6 +45,8 @@ public class PlacementController : MonoBehaviour
     {
         if (isPlacing) CancelPlacement();
 
+        _lastPlacedX    = -1;
+        _lastPlacedZ    = -1;
         currentData     = data;
         isPlacing       = true;
         costAlreadyPaid = paid;
@@ -60,9 +65,12 @@ public class PlacementController : MonoBehaviour
     public void CancelPlacement()
     {
         if (ghostObject) Destroy(ghostObject);
+        ghostObject     = null;
         isPlacing       = false;
         costAlreadyPaid = false;
         currentData     = null;
+        _lastPlacedX    = -1;
+        _lastPlacedZ    = -1;
     }
 
     // ── Update ────────────────────────────────────────────────
@@ -103,8 +111,12 @@ public class PlacementController : MonoBehaviour
             SetGhostMaterials(placementValid ? ghostValidMaterial : ghostInvalidMaterial);
         }
 
-        if (Input.GetMouseButtonDown(0) && placementValid)
-            ConfirmPlacement();
+        // Hold to draw — only place if mouse has moved to a new cell
+        if (Input.GetMouseButton(0) && placementValid)
+        {
+            if (ghostX != _lastPlacedX || ghostZ != _lastPlacedZ)
+                ConfirmPlacement();
+        }
 
         if (Input.GetKeyDown(KeyCode.Escape))
         {
@@ -130,6 +142,14 @@ public class PlacementController : MonoBehaviour
             if (!GameManager.Instance.SpendCoins(currentData.unlockCost)) return;
         }
 
+        // Store placed coords before anything else so we can restore them
+        // after BeginPlacement resets them
+        int savedX = ghostX;
+        int savedZ = ghostZ;
+
+        _lastPlacedX = savedX;
+        _lastPlacedZ = savedZ;
+
         GameObject placed = Instantiate(currentData.prefab,
             ghostObject.transform.position, Quaternion.identity);
 
@@ -142,7 +162,6 @@ public class PlacementController : MonoBehaviour
             currentData.gridHeight,
             placed);
 
-        // Store grid coords on the plot so it can free them on removal
         var plot = placed.GetComponent<FarmPlot>();
         if (plot != null)
         {
@@ -156,19 +175,23 @@ public class PlacementController : MonoBehaviour
         TutorialConsole.Log($"{currentData.placeableName} placed!");
         AudioManager.Play(SoundEvent.PlotPlaced);
 
-
+        // Fully destroy ghost before continuing
         Destroy(ghostObject);
+        ghostObject = null;
 
         PlaceableData justPlaced = currentData;
         isPlacing       = false;
         costAlreadyPaid = false;
         currentData     = null;
-        ghostObject     = null;
 
         if (GameManager.Instance.CanAfford(justPlaced.unlockCost))
         {
             BeginPlacement(justPlaced, paid: false);
-            TutorialConsole.Log($"Click to place another {justPlaced.placeableName}. Escape to stop.");
+
+            // BeginPlacement resets _lastPlaced to -1 which would allow
+            // the same cell to fire again immediately — restore saved coords
+            _lastPlacedX = savedX;
+            _lastPlacedZ = savedZ;
         }
         else
         {

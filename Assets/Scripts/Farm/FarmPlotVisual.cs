@@ -16,7 +16,6 @@ public class FarmPlotVisual : MonoBehaviour
     private Renderer plotRenderer;
     private Color    defaultPlotColor;
 
-    // Cached references
     private Camera _mainCamera;
     private Canvas _canvas;
 
@@ -45,7 +44,7 @@ public class FarmPlotVisual : MonoBehaviour
             RefreshVisual();
         }
 
-        // Pulse scale when ready
+        // Pulse scale when ready to harvest
         if (plot.State == FarmPlot.PlotState.Ready && cropObject != null)
         {
             GrowthStageVisual visual = GetStageVisual(plot.ActiveCrop, plot.CurrentStage);
@@ -120,7 +119,7 @@ public class FarmPlotVisual : MonoBehaviour
             return;
         }
 
-        // Total time remaining across all stages from current to last
+        // Total time remaining across all remaining stages
         float remaining = plot.ActiveCrop.growthStages[plot.CurrentStage].duration
                           - plot.StageTimer;
         for (int i = plot.CurrentStage + 1; i < plot.ActiveCrop.growthStages.Length - 1; i++)
@@ -150,7 +149,7 @@ public class FarmPlotVisual : MonoBehaviour
         if (timerLabel != null) { Destroy(timerLabel); timerLabel = null; }
     }
 
-    // ── Ghost ─────────────────────────────────────────────────
+    // ── Ghost preview ─────────────────────────────────────────
 
     void ShowGhost()
     {
@@ -158,8 +157,7 @@ public class FarmPlotVisual : MonoBehaviour
         CropData seed = Inventory.Instance.SelectedSeed;
         if (seed == null) return;
 
-        GrowthStageVisual visual = GetStageVisual(seed, 0);
-        ghostObject = SpawnVisual(visual);
+        ghostObject = SpawnVisual(GetStageVisual(seed, 0));
 
         if (PlacementController.GhostValid != null)
             ghostObject.GetComponent<Renderer>().material = PlacementController.GhostValid;
@@ -192,30 +190,26 @@ public class FarmPlotVisual : MonoBehaviour
             if (rend != null)
             {
                 rend.material.color = Color.Lerp(visual.stageColor, Color.yellow, 0.4f);
-                EffectsManager.StartGlow(EffectEvent.PlantReady, rend);
+                VFXManager.StartGlow(VFXEvent.PlantReady, rend);
             }
         }
         else
         {
-            // Drop animation when a new stage spawns
             Vector3 plotTop  = transform.position
                                + Vector3.up * (transform.lossyScale.y * 0.5f);
             Vector3 finalPos = plotTop + Vector3.up * (visual.scale * 0.5f);
-            EffectsManager.PlayDropAnim(EffectEvent.SeedPlanted, cropObject, finalPos);
+            VFXManager.PlayDropAnim(VFXEvent.SeedPlanted, cropObject, finalPos);
             StartCoroutine(ScalePop(cropObject, visual.scale));
         }
     }
 
     void ClearCropVisual()
     {
-        if (cropObject != null)
-        {
-            // Stop glow before destroying
-            var rend = cropObject.GetComponent<Renderer>();
-            if (rend != null) EffectsManager.StopGlow(rend);
-            Destroy(cropObject);
-            cropObject = null;
-        }
+        if (cropObject == null) return;
+        var rend = cropObject.GetComponent<Renderer>();
+        if (rend != null) VFXManager.StopGlow(rend);
+        Destroy(cropObject);
+        cropObject = null;
     }
 
     // ── Scale pop ─────────────────────────────────────────────
@@ -242,7 +236,14 @@ public class FarmPlotVisual : MonoBehaviour
             target.transform.localScale = Vector3.one * finalScale;
     }
 
-    // ── Shared spawn helper ───────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────
+
+    GrowthStageVisual GetStageVisual(CropData crop, int stageIndex)
+    {
+        if (crop.stageVisuals != null && stageIndex < crop.stageVisuals.Length)
+            return crop.stageVisuals[stageIndex];
+        return new GrowthStageVisual { stageColor = Color.green, scale = 0.3f };
+    }
 
     GameObject SpawnVisual(GrowthStageVisual visual)
     {
@@ -255,32 +256,21 @@ public class FarmPlotVisual : MonoBehaviour
         foreach (var col in go.GetComponentsInChildren<Collider>())
             Destroy(col);
 
-        float s = visual.scale;
-        go.transform.localScale = new Vector3(s, s, s);
-
+        float   s        = visual.scale;
         Vector3 plotTop  = transform.position
                            + Vector3.up * (transform.lossyScale.y * 0.5f);
         Vector3 finalPos = plotTop + Vector3.up * (s * 0.5f);
-        go.transform.position = finalPos;
 
-        // Use URP Lit shader explicitly to prevent pink material in builds
+        go.transform.localScale = new Vector3(s, s, s);
+        go.transform.position   = finalPos;
+
         if (visual.visualPrefab == null)
         {
             var rend = go.GetComponent<Renderer>();
-            rend.material = EffectsManager.CreateUrpMaterial(visual.stageColor);
+            rend.material = VFXManager.CreateMaterial(visual.stageColor);
         }
 
         return go;
-    }
-
-    // ── Helpers ───────────────────────────────────────────────
-
-    GrowthStageVisual GetStageVisual(CropData crop, int stageIndex)
-    {
-        if (crop.stageVisuals != null && stageIndex < crop.stageVisuals.Length)
-            return crop.stageVisuals[stageIndex];
-
-        return new GrowthStageVisual { stageColor = Color.green, scale = 0.3f };
     }
 
     public void ForceCleanup()

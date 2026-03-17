@@ -1,13 +1,13 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-[CreateAssetMenu(fileName = "EffectsDatabase", menuName = "Garden/Effects Database")]
-public class EffectsDatabase : ScriptableObject
+[CreateAssetMenu(fileName = "VFXDatabase", menuName = "Garden/VFX Database")]
+public class VFXDatabase : ScriptableObject
 {
     [System.Serializable]
     public struct PlantAnimConfig
     {
-        public EffectEvent Event;
+        public VFXEvent Event;
 
         [Header("Planting drop animation")]
         public float DropHeight;
@@ -22,16 +22,16 @@ public class EffectsDatabase : ScriptableObject
 
     public List<PlantAnimConfig> Effects = new List<PlantAnimConfig>();
 
-    private Dictionary<EffectEvent, PlantAnimConfig> _lookup;
+    private Dictionary<VFXEvent, PlantAnimConfig> _lookup;
 
     public void Init()
     {
-        _lookup = new Dictionary<EffectEvent, PlantAnimConfig>();
+        _lookup = new Dictionary<VFXEvent, PlantAnimConfig>();
         foreach (var entry in Effects)
             _lookup[entry.Event] = entry;
     }
 
-    public bool TryGet(EffectEvent e, out PlantAnimConfig config)
+    public bool TryGet(VFXEvent e, out PlantAnimConfig config)
     {
         if (_lookup == null) Init();
         return _lookup.TryGetValue(e, out config);

@@ -15,7 +15,7 @@ public class AudioManager : MonoBehaviour
 
     void Awake()
     {
-        Instance = this;
+        Instance   = this;
         _sfxSource = gameObject.AddComponent<AudioSource>();
         _sfxSource.playOnAwake = false;
 
@@ -26,14 +26,27 @@ public class AudioManager : MonoBehaviour
     public static void Play(SoundEvent e)
     {
         if (Instance == null || Instance.soundDatabase == null) return;
-
         if (!Instance.soundDatabase.TryGet(e, out var entry)) return;
         if (entry.Clip == null) return;
 
-        Instance._sfxSource.pitch  = Random.Range(
+        float pitch = Random.Range(
             1f - (entry.PitchVariance - 1f),
             entry.PitchVariance);
-        Instance._sfxSource.PlayOneShot(
-            entry.Clip, entry.Volume * Instance.masterVolume);
+
+        Instance._sfxSource.pitch = pitch;
+
+        // Convert linear volume to perceptual volume so slider changes
+        // feel natural — 0.5 on the slider sounds like half volume, not 90%
+        float linearVolume    = entry.Volume * Instance.masterVolume;
+        float perceptualVolume = LinearToPerceptual(linearVolume);
+
+        Instance._sfxSource.PlayOneShot(entry.Clip, perceptualVolume);
+    }
+
+    // Converts a 0-1 linear slider value to a perceptually linear volume.
+    // Uses a squared curve — simple, no log math, works well in practice.
+    private static float LinearToPerceptual(float linear)
+    {
+        return linear * linear;
     }
 }
