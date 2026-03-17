@@ -43,6 +43,7 @@ public class Inventory : MonoBehaviour
         if (empty == null)
         {
             TutorialConsole.Error("Inventory full! Sell some items first.");
+            AudioManager.Play(SoundEvent.InventoryFull);
             return false;
         }
 
@@ -120,6 +121,7 @@ public class Inventory : MonoBehaviour
         if (empty == null)
         {
             TutorialConsole.Error("Inventory full! Sell some items first.");
+            AudioManager.Play(SoundEvent.InventoryFull);
             return false;
         }
 
@@ -185,6 +187,7 @@ public class Inventory : MonoBehaviour
         if (empty == null)
         {
             TutorialConsole.Error("Inventory full! Sell some items first.");
+            AudioManager.Play(SoundEvent.InventoryFull);
             return false;
         }
 

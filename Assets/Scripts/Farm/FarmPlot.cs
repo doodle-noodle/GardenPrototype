@@ -49,6 +49,7 @@ public class FarmPlot : MonoBehaviour
         {
             State        = PlotState.Ready;
             StateChanged = true;
+            AudioManager.Play(SoundEvent.PlantReady);
             EventBus.Raise_PlotReady(this);
             TutorialConsole.Log($"{ActiveCrop.cropName} is ready to harvest!");
         }
@@ -89,6 +90,7 @@ public class FarmPlot : MonoBehaviour
         if (selected == null)
         {
             TutorialConsole.Warn("Buy a seed from the shop first in order to plant it.");
+            AudioManager.Play(SoundEvent.NoSeedSelected);
             return;
         }
 
@@ -104,6 +106,7 @@ public class FarmPlot : MonoBehaviour
         IsMutated    = false;
         State        = PlotState.Growing;
         StateChanged = true;
+        AudioManager.Play(SoundEvent.SeedPlanted);
 
         TutorialConsole.Log($"Planted {ActiveCrop.cropName}!");
         EventBus.Raise_PlotPlanted(this);
@@ -119,6 +122,7 @@ public class FarmPlot : MonoBehaviour
         {
             IsMutated = true;
             EventBus.Raise_MutationOccurred(this);
+            AudioManager.Play(SoundEvent.MutationOccurred);
             TutorialConsole.Log(
                 $"<color={UIColors.RarityMythical_Hex}>Mutation! " +
                 $"{ActiveCrop.cropName} has mutated!</color>");
@@ -140,6 +144,7 @@ public class FarmPlot : MonoBehaviour
         IsMutated    = false;
         State        = PlotState.Empty;
         StateChanged = true;
+        AudioManager.Play(SoundEvent.SeedHarvested);
     }
 
     // ── Removal by shovel ─────────────────────────────────────
@@ -155,5 +160,7 @@ public class FarmPlot : MonoBehaviour
         GetComponent<FarmPlotVisual>()?.ForceCleanup();
 
         Destroy(gameObject);
+
+        AudioManager.Play(SoundEvent.PlotRemoved);
     }
 }

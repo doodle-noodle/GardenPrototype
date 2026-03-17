@@ -133,6 +133,8 @@ public class ShopUI : MonoBehaviour
         isOpen = !isOpen;
         IsOpen = isOpen;
         shopPanel.SetActive(isOpen);
+        AudioManager.Play(SoundEvent.ShopOpened);
+
 
         if (isOpen)
         {
@@ -152,6 +154,7 @@ public class ShopUI : MonoBehaviour
         IsOpen = false;
         shopPanel.SetActive(false);
         EventBus.Raise_ShopClosed();
+        AudioManager.Play(SoundEvent.ShopClosed);
     }
 
     void OnStockRefreshed()
@@ -189,17 +192,20 @@ public class ShopUI : MonoBehaviour
                 Inventory.Instance.AddSeed(item.Crop);
                 TutorialConsole.Log($"Bought {RarityUtility.RarityLabel(item.Rarity)} " +
                     $"{item.Crop.cropName} seed. Click a farm plot to plant it.");
+                    AudioManager.Play(SoundEvent.ItemBought);
                 break;
             case ShopItem.ItemType.Placeable:
                 PlacementController.Instance.BeginPlacement(item.Placeable, paid: true);
                 TutorialConsole.Log($"Click the grid to place your " +
                     $"{item.Placeable.placeableName}. Press Escape to cancel.");
+                    AudioManager.Play(SoundEvent.ItemBought);
                 CloseShop();
                 break;
             case ShopItem.ItemType.Tool:
                 Inventory.Instance.AddTool(item.Tool);
                 TutorialConsole.Log($"Bought {RarityUtility.RarityLabel(item.Rarity)} " +
                     $"{item.Tool.toolName}. Select it from your inventory to use it.");
+                    AudioManager.Play(SoundEvent.ItemBought);
                 break;
         }
     }
@@ -243,6 +249,7 @@ public class ShopUI : MonoBehaviour
         foreach (var crop in new List<HarvestedCrop>(group))
         {
             GameManager.Instance.AddCoins(crop.SellValue);
+            AudioManager.Play(SoundEvent.ItemSold);
             Inventory.Instance.RemoveHarvest(crop);
             EventBus.Raise_CropSold(crop);
         }
@@ -267,6 +274,7 @@ public class ShopUI : MonoBehaviour
         }
 
         GameManager.Instance.AddCoins(total);
+        AudioManager.Play(SoundEvent.ItemSold);
         TutorialConsole.Log($"Sold everything for {total} coins.");
         RefreshSellButtons();
     }

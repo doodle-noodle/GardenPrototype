@@ -16,7 +16,7 @@ public class FarmPlotVisual : MonoBehaviour
     private Renderer plotRenderer;
     private Color    defaultPlotColor;
 
-    // Cached references — avoids per-frame scene searches
+    // Cached references
     private Camera _mainCamera;
     private Canvas _canvas;
 
@@ -45,7 +45,7 @@ public class FarmPlotVisual : MonoBehaviour
             RefreshVisual();
         }
 
-        // Pulse when ready
+        // Pulse scale when ready
         if (plot.State == FarmPlot.PlotState.Ready && cropObject != null)
         {
             GrowthStageVisual visual = GetStageVisual(plot.ActiveCrop, plot.CurrentStage);
@@ -190,15 +190,32 @@ public class FarmPlotVisual : MonoBehaviour
         {
             var rend = cropObject.GetComponent<Renderer>();
             if (rend != null)
+            {
                 rend.material.color = Color.Lerp(visual.stageColor, Color.yellow, 0.4f);
+                EffectsManager.StartGlow(EffectEvent.PlantReady, rend);
+            }
         }
-
-        StartCoroutine(ScalePop(cropObject, visual.scale));
+        else
+        {
+            // Drop animation when a new stage spawns
+            Vector3 plotTop  = transform.position
+                               + Vector3.up * (transform.lossyScale.y * 0.5f);
+            Vector3 finalPos = plotTop + Vector3.up * (visual.scale * 0.5f);
+            EffectsManager.PlayDropAnim(EffectEvent.SeedPlanted, cropObject, finalPos);
+            StartCoroutine(ScalePop(cropObject, visual.scale));
+        }
     }
 
     void ClearCropVisual()
     {
-        if (cropObject != null) { Destroy(cropObject); cropObject = null; }
+        if (cropObject != null)
+        {
+            // Stop glow before destroying
+            var rend = cropObject.GetComponent<Renderer>();
+            if (rend != null) EffectsManager.StopGlow(rend);
+            Destroy(cropObject);
+            cropObject = null;
+        }
     }
 
     // ── Scale pop ─────────────────────────────────────────────
@@ -225,26 +242,13 @@ public class FarmPlotVisual : MonoBehaviour
             target.transform.localScale = Vector3.one * finalScale;
     }
 
-    // ── Helpers ───────────────────────────────────────────────
-
-    // Returns the visual for a given stage, with a safe fallback
-    GrowthStageVisual GetStageVisual(CropData crop, int stageIndex)
-    {
-        if (crop.stageVisuals != null && stageIndex < crop.stageVisuals.Length)
-            return crop.stageVisuals[stageIndex];
-
-        // Fallback if stageVisuals not configured in Inspector
-        return new GrowthStageVisual { stageColor = Color.green, scale = 0.3f };
-    }
+    // ── Shared spawn helper ───────────────────────────────────
 
     GameObject SpawnVisual(GrowthStageVisual visual)
     {
         GameObject go = visual.visualPrefab != null
             ? Instantiate(visual.visualPrefab)
             : GameObject.CreatePrimitive(PrimitiveType.Sphere);
-
-        if (visual.visualPrefab == null)
-            go.GetComponent<Renderer>().material.color = visual.stageColor;
 
         go.transform.SetParent(null);
 
@@ -254,10 +258,36 @@ public class FarmPlotVisual : MonoBehaviour
         float s = visual.scale;
         go.transform.localScale = new Vector3(s, s, s);
 
-        Vector3 plotTop = transform.position + Vector3.up * (transform.lossyScale.y * 0.5f);
-        go.transform.position = plotTop + Vector3.up * (s * 0.5f);
+        Vector3 plotTop  = transform.position
+                           + Vector3.up * (transform.lossyScale.y * 0.5f);
+        Vector3 finalPos = plotTop + Vector3.up * (s * 0.5f);
+        go.transform.position = finalPos;
+
+        // Use URP Lit shader explicitly to prevent pink material in builds
+        if (visual.visualPrefab == null)
+        {
+            var rend = go.GetComponent<Renderer>();
+            rend.material = EffectsManager.CreateUrpMaterial(visual.stageColor);
+        }
 
         return go;
+    }
+
+    // ── Helpers ───────────────────────────────────────────────
+
+    GrowthStageVisual GetStageVisual(CropData crop, int stageIndex)
+    {
+        if (crop.stageVisuals != null && stageIndex < crop.stageVisuals.Length)
+            return crop.stageVisuals[stageIndex];
+
+        return new GrowthStageVisual { stageColor = Color.green, scale = 0.3f };
+    }
+
+    public void ForceCleanup()
+    {
+        ClearCropVisual();
+        HideGhost();
+        HideTimerLabel();
     }
 
     // ── Cleanup ───────────────────────────────────────────────
@@ -267,13 +297,5 @@ public class FarmPlotVisual : MonoBehaviour
         if (cropObject  != null) Destroy(cropObject);
         if (ghostObject != null) Destroy(ghostObject);
         if (timerLabel  != null) Destroy(timerLabel);
-    }
-
-    // Called by FarmPlot.RemovePlot before the GameObject is destroyed
-    public void ForceCleanup()
-    {
-        ClearCropVisual();
-        HideGhost();
-        HideTimerLabel();
     }
 }

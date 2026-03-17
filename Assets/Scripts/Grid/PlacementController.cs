@@ -154,6 +154,8 @@ public class PlacementController : MonoBehaviour
             mb.enabled = true;
 
         TutorialConsole.Log($"{currentData.placeableName} placed!");
+        AudioManager.Play(SoundEvent.PlotPlaced);
+
 
         Destroy(ghostObject);
 

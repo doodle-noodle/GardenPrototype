@@ -29,6 +29,7 @@ public class GameManager : MonoBehaviour
         if (coins < amount)
         {
             TutorialConsole.Error("Insufficient funds.");
+            AudioManager.Play(SoundEvent.InsufficientFunds);
             return false;
         }
         coins -= amount;
