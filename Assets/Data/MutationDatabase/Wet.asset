@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2261ec9b0ace7a54695d5d9c223a40d9, type: 3}
+  m_Name: Wet
+  m_EditorClassIdentifier: Assembly-CSharp::MutationData
+  mutationName: Wet
+  displaySymbol: 
+  sellMultiplier: 2
+  tintColor: {r: 0.2216981, g: 0.52138907, b: 1, a: 1}
+  applyTint: 0
+  sizeMultiplier: 1
+  combinations:
+  - combinesWith: {fileID: 11400000, guid: c563ac9f06ba00740888f4f689339464, type: 2}
+    resultsIn: {fileID: 11400000, guid: 953671eacb853e34f95658edc7e04c4c, type: 2}
+  - combinesWith: {fileID: 11400000, guid: 8f56f360a82c41a49920c04ee54dcc2d, type: 2}
+    resultsIn: {fileID: 11400000, guid: 599d70e7819caa743ab81c93f5559187, type: 2}

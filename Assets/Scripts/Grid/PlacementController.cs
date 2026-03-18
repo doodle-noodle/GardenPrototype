@@ -45,6 +45,8 @@ public class PlacementController : MonoBehaviour
     {
         if (isPlacing) CancelPlacement();
 
+        FarmPlot.SetPlacementCooldown();
+
         _lastPlacedX    = -1;
         _lastPlacedZ    = -1;
         currentData     = data;
@@ -53,6 +55,8 @@ public class PlacementController : MonoBehaviour
         framesToSkip    = 2;
 
         ghostObject = Instantiate(data.prefab);
+        ghostObject.SetActive(false);  // hide until first valid raycast position
+
         SetGhostMaterials(ghostValidMaterial);
 
         foreach (var mb in ghostObject.GetComponentsInChildren<MonoBehaviour>())
@@ -83,7 +87,6 @@ public class PlacementController : MonoBehaviour
             return;
         }
 
-        if (ghostObject) ghostObject.SetActive(true);
         if (!isPlacing) return;
 
         if (framesToSkip > 0)
@@ -101,6 +104,7 @@ public class PlacementController : MonoBehaviour
         {
             Vector3 snapped = GridManager.Instance.SnapToGrid(hit.point);
             ghostObject.transform.position = snapped;
+            ghostObject.SetActive(true);  // safe to show now that position is valid
 
             GridManager.Instance.GetCellCoords(snapped, out ghostX, out ghostZ);
             placementValid = GridManager.Instance.CanPlace(
@@ -109,6 +113,11 @@ public class PlacementController : MonoBehaviour
                 currentData.gridHeight);
 
             SetGhostMaterials(placementValid ? ghostValidMaterial : ghostInvalidMaterial);
+        }
+        else
+        {
+            // Hide ghost when raycast misses — cursor is off the grid
+            if (ghostObject) ghostObject.SetActive(false);
         }
 
         // Hold to draw — only place if mouse has moved to a new cell
@@ -142,8 +151,6 @@ public class PlacementController : MonoBehaviour
             if (!GameManager.Instance.SpendCoins(currentData.unlockCost)) return;
         }
 
-        // Store placed coords before anything else so we can restore them
-        // after BeginPlacement resets them
         int savedX = ghostX;
         int savedZ = ghostZ;
 
@@ -174,9 +181,7 @@ public class PlacementController : MonoBehaviour
 
         TutorialConsole.Log($"{currentData.placeableName} placed!");
         AudioManager.Play(SoundEvent.PlotPlaced);
-        FarmPlot.SetPlacementCooldown(0.25f);
 
-        // Fully destroy ghost before continuing
         Destroy(ghostObject);
         ghostObject = null;
 
@@ -187,9 +192,7 @@ public class PlacementController : MonoBehaviour
 
         if (GameManager.Instance.CanAfford(justPlaced.unlockCost))
         {
-            FarmPlot.SetPlacementCooldown(0.25f);
             BeginPlacement(justPlaced, paid: false);
-
             _lastPlacedX = savedX;
             _lastPlacedZ = savedZ;
         }

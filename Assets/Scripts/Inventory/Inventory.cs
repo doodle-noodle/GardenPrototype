@@ -222,7 +222,7 @@ public class Inventory : MonoBehaviour
         {
             foreach (var h in slot.Harvested)
             {
-                var key = (h.Source, h.Rank, h.IsMutated);
+                var key = (h.Source, h.Rank, h.IsEvolved);
                 if (!groups.ContainsKey(key))
                     groups[key] = new List<HarvestedCrop>();
                 groups[key].Add(h);

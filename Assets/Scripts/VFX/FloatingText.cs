@@ -5,23 +5,27 @@ using TMPro;
 public static class FloatingText
 {
     private static readonly Queue<GameObject> Pool = new Queue<GameObject>();
-    private static Canvas  _cachedCanvas;
-    private static Camera  _cachedCamera;
+    private static Canvas _cachedCanvas;
+    private static Camera _cachedCamera;
 
     // ── Public API ────────────────────────────────────────────
 
-    public static void Spawn(string text, Vector3 worldPos, Color color)
+    public static void Spawn(string text, Vector3 worldPos, Color color, int fontSize = 18)
     {
         EnsureCache();
         if (_cachedCanvas == null) return;
 
         GameObject go  = GetFromPool();
         var        tmp = go.GetComponent<TextMeshProUGUI>();
-        tmp.text  = text;
-        tmp.color = color;
+        tmp.text      = text;
+        tmp.color     = color;
+        tmp.fontSize  = ScaledFontSize(fontSize);
+        tmp.fontStyle = FontStyles.Bold;
+
+        ApplyOutline(tmp, 0.2f);
 
         var rt = go.GetComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(200f, 50f);
+        rt.sizeDelta = new Vector2(200f, 80f);
 
         Vector2 screenPos = _cachedCamera.WorldToScreenPoint(worldPos);
         RectTransformUtility.ScreenPointToLocalPointInRectangle(
@@ -31,6 +35,34 @@ public static class FloatingText
 
         go.SetActive(true);
         go.GetComponent<FloatingTextMover>().Init(color);
+    }
+
+    // Scales font size with zoom so text stays readable at all distances
+    public static int ScaledFontSize(int baseSize)
+    {
+        if (DioramaCamera.Instance == null) return baseSize;
+        float t = Mathf.InverseLerp(
+            DioramaCamera.Instance.maxZoom,
+            DioramaCamera.Instance.minZoom,
+            DioramaCamera.Instance.zoomHeight);
+        return Mathf.RoundToInt(Mathf.Lerp(baseSize * 0.7f, baseSize * 1.1f, t));
+    }
+
+    // Applies a black outline via TMP's shader properties directly.
+    // Creates an instanced material so changes don't affect other TMP objects.
+    // Width is clamped to 0.4f max — above that the outline eats into the glyphs.
+    public static void ApplyOutline(TextMeshProUGUI tmp, float width = 0.2f)
+    {
+        if (tmp == null) return;
+
+        // Instance the material so this object's outline is independent
+        tmp.fontMaterial = new Material(tmp.fontMaterial);
+
+        var mat = tmp.fontMaterial;
+        mat.EnableKeyword(ShaderUtilities.Keyword_Outline);
+        mat.SetFloat(ShaderUtilities.ID_OutlineWidth, Mathf.Clamp(width, 0f, 0.4f));
+        mat.SetColor(ShaderUtilities.ID_OutlineColor, Color.black);
+        tmp.UpdateMeshPadding();
     }
 
     public static void ReturnToPool(GameObject go)
@@ -52,7 +84,6 @@ public static class FloatingText
 
     static GameObject GetFromPool()
     {
-        // Drain stale null references from old scenes
         while (Pool.Count > 0)
         {
             var go = Pool.Dequeue();
@@ -100,9 +131,10 @@ public class FloatingTextMover : MonoBehaviour
         var rt = GetComponent<RectTransform>();
         rt.anchoredPosition = startPos + Vector2.up * (60f * t);
 
-        var col = startColor;
-        col.a   = Mathf.Lerp(1f, 0f, t * t);
-        GetComponent<TextMeshProUGUI>().color = col;
+        var tmp   = GetComponent<TextMeshProUGUI>();
+        var col   = startColor;
+        col.a     = Mathf.Lerp(1f, 0f, t * t);
+        tmp.color = col;
 
         if (elapsed >= duration)
             FloatingText.ReturnToPool(gameObject);

@@ -26,10 +26,10 @@ public class ShopUI : MonoBehaviour
     private const float Gap         = 16f;
 
     // ── Hold-to-buy settings ──────────────────────────────────
-    private const float HoldInitialDelay  = 0.4f;   // seconds before repeat starts
-    private const float HoldRepeatMin     = 0.15f;  // slowest repeat interval
-    private const float HoldRepeatMax     = 0.02f;  // fastest repeat interval
-    private const float HoldAccelDuration = 3f;     // seconds to reach max speed
+    private const float HoldInitialDelay  = 0.4f;
+    private const float HoldRepeatMin     = 0.15f;
+    private const float HoldRepeatMax     = 0.02f;
+    private const float HoldAccelDuration = 3f;
 
     private GameObject      shopPanel;
     private Transform       stockContainer;
@@ -40,7 +40,7 @@ public class ShopUI : MonoBehaviour
 
     // ── Hold-to-buy state ─────────────────────────────────────
     private ShopItem  _heldItem;
-    private bool      _holdActive     = false;
+    private bool      _holdActive    = false;
     private Coroutine _holdCoroutine;
 
     // ── Lifecycle ─────────────────────────────────────────────
@@ -189,27 +189,27 @@ public class ShopUI : MonoBehaviour
                 Vector2.zero, new Vector2(ButtonW, ButtonH),
                 btnColor, () => BuyItem(captured));
 
-            // Add hold-to-buy only for consumable items (seeds)
-            // Non-consumable items like tools and placeables use single click only
             if (item.Type == ShopItem.ItemType.Seed)
                 AddHoldToBuy(btn, captured);
         }
     }
 
-    // Attaches pointer down/up events for hold-to-buy behaviour
     void AddHoldToBuy(GameObject btn, ShopItem item)
     {
         var trigger = btn.AddComponent<EventTrigger>();
 
-        var pointerDown = new EventTrigger.Entry { eventID = EventTriggerType.PointerDown };
+        var pointerDown = new EventTrigger.Entry
+            { eventID = EventTriggerType.PointerDown };
         pointerDown.callback.AddListener(_ => StartHold(item));
         trigger.triggers.Add(pointerDown);
 
-        var pointerUp = new EventTrigger.Entry { eventID = EventTriggerType.PointerUp };
+        var pointerUp = new EventTrigger.Entry
+            { eventID = EventTriggerType.PointerUp };
         pointerUp.callback.AddListener(_ => StopHold());
         trigger.triggers.Add(pointerUp);
 
-        var pointerExit = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
+        var pointerExit = new EventTrigger.Entry
+            { eventID = EventTriggerType.PointerExit };
         pointerExit.callback.AddListener(_ => StopHold());
         trigger.triggers.Add(pointerExit);
     }
@@ -235,7 +235,6 @@ public class ShopUI : MonoBehaviour
 
     IEnumerator HoldBuyRoutine()
     {
-        // Initial delay before repeat starts
         yield return new WaitForSeconds(HoldInitialDelay);
 
         float holdTime = 0f;
@@ -243,13 +242,9 @@ public class ShopUI : MonoBehaviour
         while (_holdActive && _heldItem != null)
         {
             BuyItem(_heldItem);
-
             holdTime += HoldRepeatMin;
-
-            // Gradually decrease interval as hold time increases
             float t        = Mathf.Clamp01(holdTime / HoldAccelDuration);
             float interval = Mathf.Lerp(HoldRepeatMin, HoldRepeatMax, t);
-
             yield return new WaitForSeconds(interval);
         }
     }
@@ -301,9 +296,26 @@ public class ShopUI : MonoBehaviour
             int    total    = 0;
             foreach (var h in captured) total += h.SellValue;
 
-            string label = $"Sell {sample.DisplayName} " +
-                           $"{RankUtility.RankLabel(sample.Rank)} " +
-                           $"x{captured.Count}  —  +{total} coins";
+            // Build colored mutation prefix
+            string mutationPrefix = "";
+            if (sample.Mutations != null && sample.Mutations.Count > 0)
+            {
+                var coloredMutations = new List<string>();
+                foreach (var m in sample.Mutations)
+                {
+                    string hex = "#" + ColorUtility.ToHtmlStringRGB(m.tintColor);
+                    coloredMutations.Add($"<color={hex}>{m.mutationName}</color>");
+                }
+                mutationPrefix = string.Join(" ", coloredMutations) + " ";
+            }
+
+            // Gold yellow for coin amount
+            string goldHex = "#" + ColorUtility.ToHtmlStringRGB(UIColors.FloatingGold);
+
+            string label = $"Sell {mutationPrefix}{sample.DisplayName} " +
+                           $"{RankUtility.RankLabel(sample.Rank)}  " +
+                           $"x{captured.Count}  " +
+                           $"<color={goldHex}>+{total} coins</color>";
 
             MakeButton(sellContainer, label, Vector2.zero,
                 new Vector2(ButtonW, ButtonH),

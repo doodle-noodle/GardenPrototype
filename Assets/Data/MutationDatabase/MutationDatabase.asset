@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 80a514814f8398e44befeff8bde00a32, type: 3}
+  m_Name: MutationDatabase
+  m_EditorClassIdentifier: Assembly-CSharp::MutationDatabase
+  AllMutations:
+  - {fileID: 11400000, guid: 29a36d8924dd4eb408ab4ee688519cac, type: 2}
+  - {fileID: 11400000, guid: c563ac9f06ba00740888f4f689339464, type: 2}
+  - {fileID: 11400000, guid: 953671eacb853e34f95658edc7e04c4c, type: 2}
+  - {fileID: 11400000, guid: 8f56f360a82c41a49920c04ee54dcc2d, type: 2}
+  - {fileID: 11400000, guid: 0d5025b7f4838ac4ea4a9faacdf61796, type: 2}
+  - {fileID: 11400000, guid: 599d70e7819caa743ab81c93f5559187, type: 2}

@@ -1,24 +1,46 @@
-// Represents one harvested crop instance with its own rank and mutation state.
-// This is a plain data class — no MonoBehaviour.
+using System.Collections.Generic;
+using UnityEngine;
+
 [System.Serializable]
 public class HarvestedCrop
 {
-    public CropData Source;
-    public Rank     Rank;
-    public bool     IsMutated;
-    public int      RelationshipLevel;  // used by dating mechanics later
+    public CropData           Source;
+    public Rank               Rank;
+    public bool               IsEvolved;
+    public List<MutationData> Mutations         = new List<MutationData>();
+    public int                RelationshipLevel;
 
-    public int SellValue =>
-        (int)(Source.sellValue * RankUtility.SellMultiplier(Rank) * (IsMutated ? 1.5f : 1f));
+    public int SellValue
+    {
+        get
+        {
+            float multiplier = RankUtility.SellMultiplier(Rank);
+            multiplier *= IsEvolved ? 1.5f : 1f;
+            foreach (var m in Mutations)
+                multiplier *= m.sellMultiplier;
+            return (int)(Source.sellValue * multiplier);
+        }
+    }
 
     public string DisplayName =>
-        IsMutated ? $"Mutant {Source.cropName}" : Source.cropName;
+        IsEvolved ? $"Evolved {Source.cropName}" : Source.cropName;
 
-    public HarvestedCrop(CropData source, Rank rank, bool isMutated)
+    public string MutationDisplay
+    {
+        get
+        {
+            if (Mutations == null || Mutations.Count == 0) return "";
+            var names = new List<string>();
+            foreach (var m in Mutations) names.Add(m.mutationName);
+            return string.Join(" + ", names);
+        }
+    }
+
+    public HarvestedCrop(CropData source, Rank rank, bool isEvolved)
     {
         Source            = source;
         Rank              = rank;
-        IsMutated         = isMutated;
+        IsEvolved         = isEvolved;
         RelationshipLevel = 0;
     }
 }

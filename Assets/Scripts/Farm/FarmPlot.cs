@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class FarmPlot : MonoBehaviour
@@ -5,12 +6,13 @@ public class FarmPlot : MonoBehaviour
     public enum PlotState { Empty, Growing, Ready }
 
     // ── Public state ──────────────────────────────────────────
-    public PlotState State        { get; private set; } = PlotState.Empty;
-    public CropData  ActiveCrop   { get; private set; }
-    public int       CurrentStage { get; private set; } = -1;
-    public float     StageTimer   { get; private set; } = 0f;
-    public bool      IsMutated    { get; private set; } = false;
-    public bool      StateChanged { get; private set; }
+    public PlotState          State        { get; private set; } = PlotState.Empty;
+    public CropData           ActiveCrop   { get; private set; }
+    public int                CurrentStage { get; private set; } = -1;
+    public float              StageTimer   { get; private set; } = 0f;
+    public bool               IsEvolved    { get; private set; } = false;
+    public bool               StateChanged { get; private set; }
+    public List<MutationData> Mutations    { get; private set; } = new List<MutationData>();
 
     public int GridX { get; set; }
     public int GridZ { get; set; }
@@ -73,6 +75,34 @@ public class FarmPlot : MonoBehaviour
             EventBus.Raise_PlotReady(this);
             TutorialConsole.Log($"{ActiveCrop.cropName} is ready to harvest!");
         }
+    }
+
+    // ── Mutations ─────────────────────────────────────────────
+
+    public void ApplyMutation(MutationData mutation)
+    {
+        if (mutation == null || Mutations.Contains(mutation)) return;
+
+        // Check if this mutation combines with any existing ones
+        foreach (var existing in new List<MutationData>(Mutations))
+        {
+            foreach (var combo in existing.combinations)
+            {
+                if (combo.combinesWith == mutation)
+                {
+                    Mutations.Remove(existing);
+                    Mutations.Add(combo.resultsIn);
+                    StateChanged = true;
+                    TutorialConsole.Log($"{ActiveCrop?.cropName} is now " +
+                        $"{combo.resultsIn.mutationName}!");
+                    return;
+                }
+            }
+        }
+
+        Mutations.Add(mutation);
+        StateChanged = true;
+        TutorialConsole.Log($"{ActiveCrop?.cropName} is now {mutation.mutationName}!");
     }
 
     // ── Input ─────────────────────────────────────────────────
@@ -163,7 +193,8 @@ public class FarmPlot : MonoBehaviour
         ActiveCrop   = selected;
         CurrentStage = 0;
         StageTimer   = 0f;
-        IsMutated    = false;
+        IsEvolved    = false;
+        Mutations.Clear();
         State        = PlotState.Growing;
         StateChanged = true;
 
@@ -171,7 +202,6 @@ public class FarmPlot : MonoBehaviour
         TutorialConsole.Log($"Planted {ActiveCrop.cropName}!");
         EventBus.Raise_PlotPlanted(this);
 
-        // Trigger burial animation — visual delays showing crop until it completes
         _visual?.PlayBurialAnimation(ActiveCrop);
     }
 
@@ -181,23 +211,27 @@ public class FarmPlot : MonoBehaviour
     {
         var result = HarvestResolver.Resolve(ActiveCrop);
 
-        if (result.IsMutated)
+        if (result.IsEvolved)
         {
-            IsMutated = true;
+            IsEvolved = true;
             EventBus.Raise_MutationOccurred(this);
             AudioManager.Play(SoundEvent.MutationOccurred);
             TutorialConsole.Log(
-                $"<color={UIColors.RarityMythical_Hex}>Mutation! " +
-                $"{ActiveCrop.cropName} has mutated!</color>");
+                $"<color={UIColors.RarityMythical_Hex}>Evolved! " +
+                $"{ActiveCrop.cropName} has evolved!</color>");
         }
+
+        // Pass active mutations to harvested crop
+        foreach (var m in Mutations)
+            result.Mutations.Add(m);
 
         Inventory.Instance.AddHarvest(result);
         AudioManager.Play(SoundEvent.SeedHarvested);
 
         FloatingText.Spawn(
-            $"+{result.SellValue}  {RankUtility.RankLabel(result.Rank)}",
+            $"+{result.SellValue}",
             transform.position + Vector3.up * 1.5f,
-            UIColors.FloatingGold);
+            UIColors.FloatingGold,28);
 
         TutorialConsole.Log($"Harvested {RankUtility.RankLabel(result.Rank)} " +
             $"{result.DisplayName} — worth {result.SellValue} coins.");
@@ -223,7 +257,8 @@ public class FarmPlot : MonoBehaviour
         ActiveCrop   = null;
         CurrentStage = -1;
         StageTimer   = 0f;
-        IsMutated    = false;
+        IsEvolved    = false;
+        Mutations.Clear();
         State        = PlotState.Empty;
         StateChanged = true;
     }

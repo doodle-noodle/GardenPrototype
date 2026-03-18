@@ -2,6 +2,8 @@
 
 public class DioramaCamera : MonoBehaviour
 {
+    public static DioramaCamera Instance;
+
     [Header("Angle")]
     public float pitch       = 45f;
     public float yaw         = 45f;
@@ -20,9 +22,9 @@ public class DioramaCamera : MonoBehaviour
     [Header("Rotation — hold right mouse button")]
     public float rotateSpeed = 240f;
 
-    [Header("Bounds — auto-calculated from grid, override if needed")]
-    public Vector2 panMin = new Vector2(-2f,  -2f);
-    public Vector2 panMax = new Vector2(14f,  14f);
+    [Header("Bounds")]
+    public Vector2 panMin    = new Vector2(-2f,  -2f);
+    public Vector2 panMax    = new Vector2(14f,  14f);
 
     private Vector3 targetLookAt;
     private float   targetZoom;
@@ -30,6 +32,11 @@ public class DioramaCamera : MonoBehaviour
     // ── Setup ─────────────────────────────────────────────────
 
     void Awake()
+    {
+        Instance = this;
+    }
+
+    void Start()
     {
         // Auto-calculate pan bounds from grid size
         if (GridManager.Instance != null)
@@ -52,7 +59,7 @@ public class DioramaCamera : MonoBehaviour
         }
         else if (transform.forward.y < 0f)
         {
-            float t  = -transform.position.y / transform.forward.y;
+            float t      = -transform.position.y / transform.forward.y;
             targetLookAt = transform.position + transform.forward * t;
         }
         else
@@ -143,6 +150,8 @@ public class DioramaCamera : MonoBehaviour
         }
         return Vector3.zero;
     }
+
+    // ── Editor gizmo ─────────────────────────────────────────
 
     void OnDrawGizmos()
     {
