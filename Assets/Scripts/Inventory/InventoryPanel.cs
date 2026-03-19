@@ -81,7 +81,6 @@ public class InventoryPanel : MonoBehaviour
         _panel = new GameObject("InventoryStoragePanel",
             typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         _panel.transform.SetParent(canvas.transform, false);
-        // No SetSiblingIndex — leave hierarchy order alone
 
         var panelRt              = _panel.GetComponent<RectTransform>();
         panelRt.anchorMin        = new Vector2(0.5f, 0f);
@@ -147,6 +146,11 @@ public class InventoryPanel : MonoBehaviour
         var img           = go.GetComponent<Image>();
         img.color         = UIColors.SlotEmpty;
         img.raycastTarget = true;
+
+        // Drag handler — allows dragging to/from hotbar
+        var drag       = go.AddComponent<InventoryDragHandler>();
+        drag.IsHotbar  = false;
+        drag.SlotIndex = index;
 
         var main = MakeTMP(go.transform, "M",
             new Vector2(0f, 3f), new Vector2(-4f, -16f), FontBody);

@@ -74,8 +74,6 @@ public class InventoryHotbar : MonoBehaviour
         HandleNumberKeys();
     }
 
-    // ── Build ─────────────────────────────────────────────────
-
     void BuildHotbar()
     {
         Canvas canvas = FindFirstObjectByType<Canvas>();
@@ -91,12 +89,11 @@ public class InventoryHotbar : MonoBehaviour
         float panelW = count * slotSz + (count - 1) * SlotSpacing + PanelPadding * 2f;
         float panelH = slotSz + PanelPadding * 2f;
 
-        // ── Hotbar panel ──────────────────────────────────────
         var panel = new GameObject("InventoryHotbar",
             typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         panel.transform.SetParent(canvas.transform, false);
 
-        var rt = panel.GetComponent<RectTransform>();
+        var rt              = panel.GetComponent<RectTransform>();
         rt.anchorMin        = new Vector2(0.5f, 0f);
         rt.anchorMax        = new Vector2(0.5f, 0f);
         rt.pivot            = new Vector2(0.5f, 0f);
@@ -116,7 +113,7 @@ public class InventoryHotbar : MonoBehaviour
                 bodyFont, labelFont);
         }
 
-        // ── Inventory button ──────────────────────────────────
+        // Inventory button — separate sibling, left of hotbar
         float hotbarLeftEdge = -(panelW * 0.5f);
         float invBtnX        = hotbarLeftEdge - InvBtnGap - InvBtnSize * 0.5f;
 
@@ -176,6 +173,11 @@ public class InventoryHotbar : MonoBehaviour
         var img           = root.GetComponent<Image>();
         img.raycastTarget = true;
 
+        // Drag handler — allows dragging slots to inventory panel and back
+        var drag       = root.AddComponent<InventoryDragHandler>();
+        drag.IsHotbar  = true;
+        drag.SlotIndex = index;
+
         var main = MakeLabel(root.transform, "M",
             new Vector2(0f, 3f), new Vector2(-4f, -16f), bodyFont);
         main.text  = $"[{index + 1}]";
@@ -193,8 +195,6 @@ public class InventoryHotbar : MonoBehaviour
             Btn        = root.GetComponent<Button>()
         };
     }
-
-    // ── Refresh ───────────────────────────────────────────────
 
     public void Refresh()
     {
@@ -218,7 +218,11 @@ public class InventoryHotbar : MonoBehaviour
         el.MainLabel.text   = $"[{index + 1}]";
         el.MainLabel.color  = UIColors.TextDim;
         el.TypeLabel.text   = "";
-        el.Btn.onClick.AddListener(() => { Inventory.Instance.Deselect(); Refresh(); });
+        el.Btn.onClick.AddListener(() =>
+        {
+            Inventory.Instance.Deselect();
+            Refresh();
+        });
     }
 
     void SetSeed(SlotElements el, InventorySlot slot)

@@ -5,7 +5,6 @@ public class FarmPlot : MonoBehaviour
 {
     public enum PlotState { Empty, Growing, Ready }
 
-    // ── Public state ──────────────────────────────────────────
     public PlotState          State        { get; private set; } = PlotState.Empty;
     public CropData           ActiveCrop   { get; private set; }
     public int                CurrentStage { get; private set; } = -1;
@@ -18,16 +17,10 @@ public class FarmPlot : MonoBehaviour
     public int GridX { get; set; }
     public int GridZ { get; set; }
 
-    // ── Cached references ─────────────────────────────────────
     private FarmPlotVisual _visual;
+    private bool           _hasTriedPlantingThisHover = false;
+    private float          _wateringSpeedMultiplier   = 1f;
 
-    // ── Per-plot speed from watering can ──────────────────────
-    private float _wateringSpeedMultiplier = 1f;
-
-    // ── Hover state ───────────────────────────────────────────
-    private bool _hasTriedPlantingThisHover = false;
-
-    // ── Static placement cooldown ─────────────────────────────
     private static float _placementCooldownUntil = 0f;
 
     public static void SetPlacementCooldown(float duration = 0.15f)
@@ -36,14 +29,10 @@ public class FarmPlot : MonoBehaviour
     private static bool PlacementCooldownActive =>
         Time.time < _placementCooldownUntil;
 
-    // ── Setup ─────────────────────────────────────────────────
-
     void Awake()
     {
         _visual = GetComponent<FarmPlotVisual>();
     }
-
-    // ── Growing ───────────────────────────────────────────────
 
     void Update()
     {
@@ -58,7 +47,6 @@ public class FarmPlot : MonoBehaviour
             return;
         }
 
-        // Combine watering speed and active world event growth speed
         float speed = _wateringSpeedMultiplier *
                       (WorldEventManager.Instance?.GrowthSpeedMultiplier ?? 1f);
         StageTimer += Time.deltaTime * speed;
@@ -88,14 +76,12 @@ public class FarmPlot : MonoBehaviour
     {
         if (mutation == null) return;
 
-        // Check for combinations first
         foreach (var existing in new List<MutationData>(Mutations))
         {
             if (existing.combinations == null) continue;
             foreach (var combo in existing.combinations)
             {
                 if (combo.combinesWith != mutation || combo.resultsIn == null) continue;
-                // Skip if result is already present (prevents duplicates)
                 if (Mutations.Contains(combo.resultsIn)) return;
                 Mutations.Remove(existing);
                 Mutations.Add(combo.resultsIn);
@@ -106,7 +92,6 @@ public class FarmPlot : MonoBehaviour
             }
         }
 
-        // No combination — only add if not already present
         if (Mutations.Contains(mutation)) return;
         Mutations.Add(mutation);
         StateChanged = true;
@@ -139,13 +124,16 @@ public class FarmPlot : MonoBehaviour
 
     void OnMouseOver()
     {
-        if (PlacementController.Instance != null && PlacementController.Instance.IsPlacing) return;
+        if (PlacementController.Instance != null &&
+            PlacementController.Instance.IsPlacing) return;
         if (PlacementCooldownActive) return;
 
         _visual?.OnHoverStay();
 
         if (ShopUI.IsOpen) return;
-        if (Inventory.Instance.SelectedSlot?.Type == InventoryItemType.Tool) return;
+
+        // Only shovel blocks hover planting — other tools allow normal interaction
+        if (ShovelEquipped()) return;
 
         if (Input.GetMouseButtonUp(0))
         {
@@ -153,7 +141,8 @@ public class FarmPlot : MonoBehaviour
             return;
         }
 
-        if (Input.GetMouseButton(0) && State == PlotState.Empty && !_hasTriedPlantingThisHover)
+        if (Input.GetMouseButton(0) && State == PlotState.Empty &&
+            !_hasTriedPlantingThisHover)
         {
             _hasTriedPlantingThisHover = true;
             TryPlant();
@@ -162,11 +151,23 @@ public class FarmPlot : MonoBehaviour
 
     void OnMouseDown()
     {
-        if (PlacementController.Instance != null && PlacementController.Instance.IsPlacing) return;
+        if (PlacementController.Instance != null &&
+            PlacementController.Instance.IsPlacing) return;
         if (PlacementCooldownActive) return;
         if (ShopUI.IsOpen) return;
-        if (Inventory.Instance.SelectedSlot?.Type == InventoryItemType.Tool) return;
+
+        // Only shovel blocks plot interaction — watering can and other tools
+        // should not prevent planting or harvesting
+        if (ShovelEquipped()) return;
+
         HandleClick();
+    }
+
+    // Returns true only when the shovel is the active tool
+    bool ShovelEquipped()
+    {
+        var tool = Inventory.Instance.SelectedSlot?.Tool;
+        return tool != null && tool.toolType == ToolType.Shovel;
     }
 
     void HandleClick()
@@ -222,7 +223,6 @@ public class FarmPlot : MonoBehaviour
         AudioManager.Play(SoundEvent.SeedPlanted);
         TutorialConsole.Log($"Planted {ActiveCrop.cropName}!");
         EventBus.Raise_PlotPlanted(this);
-
         _visual?.PlayBurialAnimation(ActiveCrop);
     }
 
@@ -232,7 +232,6 @@ public class FarmPlot : MonoBehaviour
     {
         var result = HarvestResolver.Resolve(ActiveCrop);
 
-        // IsEvolved is entirely hidden from players — no log, no notification
         if (result.IsEvolved) IsEvolved = true;
 
         foreach (var m in Mutations) result.Mutations.Add(m);
@@ -246,7 +245,6 @@ public class FarmPlot : MonoBehaviour
             UIColors.FloatingGold, 28);
 
         TutorialConsole.Log($"Harvested {result.DisplayName} — worth {result.SellValue} coins.");
-
         _hasTriedPlantingThisHover = true;
         ResetState();
     }
@@ -274,7 +272,6 @@ public class FarmPlot : MonoBehaviour
         Mutations.Clear();
         State        = PlotState.Empty;
         StateChanged = true;
-
         _visual?.ResetWateringColor();
     }
 }
