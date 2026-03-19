@@ -23,7 +23,7 @@ MonoBehaviour:
     PitchVariance: 1.05
   - Event: 2
     Clip: {fileID: 8300000, guid: a013dad9693d8a3418a05f4f51b823a2, type: 3}
-    Volume: 0.3
+    Volume: 0.4
     PitchVariance: 1.05
   - Event: 3
     Clip: {fileID: 8300000, guid: 391e64a1f5a3aab49945c9e702adcac0, type: 3}
@@ -55,10 +55,10 @@ MonoBehaviour:
     PitchVariance: 1
   - Event: 12
     Clip: {fileID: 8300000, guid: 6927e00031536f94e9b9e24ee6f2fe55, type: 3}
-    Volume: 0.7
+    Volume: 0.5
     PitchVariance: 1
   - Event: 13
-    Clip: {fileID: 0}
+    Clip: {fileID: 8300000, guid: b2a44b410e48cbc4381916520f9fffde, type: 3}
     Volume: 0.4
     PitchVariance: 1
   - Event: 11

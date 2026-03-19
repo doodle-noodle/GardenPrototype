@@ -119,7 +119,7 @@ public class FarmPlotVisual : MonoBehaviour
     {
         if (plotRenderer == null) yield break;
         float elapsed    = 0f;
-        float duration   = 3f;
+        float duration   = 1f;
         Color startColor = _currentBaseColor;
         Color wetSoil    = new Color(0.25f, 0.12f, 0.04f);
 
