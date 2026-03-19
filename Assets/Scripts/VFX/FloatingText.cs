@@ -1,19 +1,28 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI; 
+using UnityEngine.UI;
 using TMPro;
 
 public static class FloatingText
 {
-    private static readonly Queue<GameObject> Pool          = new Queue<GameObject>();
-    private static Canvas                     _floatCanvas;  // dedicated low-sort canvas
-    private static Canvas                     _mainCanvas;
-    private static Camera                     _cachedCamera;
+    private static readonly Queue<GameObject> Pool = new Queue<GameObject>();
+    private static Camera  _camera;
+
+    // Dedicated canvas at sort order -1 — always renders behind main UI (sort 0)
+    private static Canvas _canvas;
+
+    // Exposed so FarmPlotVisual can parent its world labels here too
+    public static Canvas WorldLabelCanvas
+    {
+        get { EnsureCanvas(); return _canvas; }
+    }
+
+    // ── Public API ────────────────────────────────────────────
 
     public static void Spawn(string text, Vector3 worldPos, Color color, int fontSize = 18)
     {
-        EnsureCache();
-        if (_floatCanvas == null) return;
+        EnsureCanvas();
+        if (_canvas == null) return;
 
         var go  = GetFromPool();
         var tmp = go.GetComponent<TextMeshProUGUI>();
@@ -22,18 +31,21 @@ public static class FloatingText
         tmp.fontSize  = ScaledFontSize(fontSize);
         tmp.fontStyle = FontStyles.Bold;
 
-        var rt = go.GetComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(200f, 80f);
-
-        // Use main canvas for world-to-screen conversion
-        Vector2 screenPos = _cachedCamera.WorldToScreenPoint(worldPos);
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            _floatCanvas.GetComponent<RectTransform>(),
-            screenPos, null, out Vector2 localPos);
-        rt.anchoredPosition = localPos;
+        PositionAtWorld(go.GetComponent<RectTransform>(), worldPos);
 
         go.SetActive(true);
         go.GetComponent<FloatingTextMover>().Init(color);
+    }
+
+    // Positions any RectTransform on the world label canvas at a world position
+    public static void PositionOnCanvas(RectTransform rt, Vector3 worldPos)
+    {
+        EnsureCanvas();
+        if (_camera == null || _canvas == null) return;
+        Vector2 screen = _camera.WorldToScreenPoint(worldPos);
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            _canvas.GetComponent<RectTransform>(), screen, null, out var local);
+        rt.anchoredPosition = local;
     }
 
     public static int ScaledFontSize(int baseSize)
@@ -53,31 +65,32 @@ public static class FloatingText
         Pool.Enqueue(go);
     }
 
-    // ── Cache / pool ──────────────────────────────────────────
+    // ── Internals ─────────────────────────────────────────────
 
-    static void EnsureCache()
+    static void PositionAtWorld(RectTransform rt, Vector3 worldPos)
     {
-        if (_cachedCamera == null) _cachedCamera = Camera.main;
-        if (_floatCanvas != null) return;
+        rt.sizeDelta = new Vector2(200f, 80f);
+        PositionOnCanvas(rt, worldPos);
+    }
 
-        // Find main canvas — it keeps its default sort order (0)
-        _mainCanvas = Object.FindFirstObjectByType<Canvas>();
+    static void EnsureCanvas()
+    {
+        if (_camera == null) _camera = Camera.main;
+        if (_canvas != null) return;
 
-        // Dedicated canvas for floating texts at sort order -1
-        // This renders BEHIND the main UI canvas (sort order 0)
-        var go = new GameObject("FloatingTextCanvas",
+        var go = new GameObject("WorldLabelCanvas",
             typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler));
         Object.DontDestroyOnLoad(go);
 
-        _floatCanvas = go.GetComponent<Canvas>();
-        _floatCanvas.renderMode   = RenderMode.ScreenSpaceOverlay;
-        _floatCanvas.sortingOrder = -1; // always behind main UI
+        _canvas = go.GetComponent<Canvas>();
+        _canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
+        _canvas.sortingOrder = -1; // behind main UI canvas (sort order 0)
 
         var scaler = go.GetComponent<CanvasScaler>();
         scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920f, 1080f);
         scaler.matchWidthOrHeight  = 0.5f;
-        // No GraphicRaycaster — floating texts never need to receive clicks
+        // No GraphicRaycaster — world labels never receive clicks
     }
 
     static GameObject GetFromPool()
@@ -92,10 +105,11 @@ public static class FloatingText
 
     static GameObject CreateNew()
     {
+        EnsureCanvas();
         var go = new GameObject("FloatingText",
             typeof(RectTransform), typeof(CanvasRenderer),
             typeof(TextMeshProUGUI), typeof(FloatingTextMover));
-        go.transform.SetParent(_floatCanvas.transform, false);
+        go.transform.SetParent(_canvas.transform, false);
 
         var tmp           = go.GetComponent<TextMeshProUGUI>();
         tmp.fontSize      = 18;
