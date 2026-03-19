@@ -1,3 +1,7 @@
+#if UNITY_EDITOR
+// Debug tool — compiles out of all non-editor builds automatically.
+// Move this file to Scripts/Debug/ to keep it separate from runtime code.
+// Do NOT ship this in any web or release build.
 using UnityEngine;
 
 public class MutationTester : MonoBehaviour
@@ -36,3 +40,4 @@ public class MutationTester : MonoBehaviour
         _mutationIndex++;
     }
 }
+#endif
