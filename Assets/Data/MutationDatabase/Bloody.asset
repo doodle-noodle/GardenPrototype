@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2261ec9b0ace7a54695d5d9c223a40d9, type: 3}
-  m_Name: Moonlit
+  m_Name: Bloody
   m_EditorClassIdentifier: Assembly-CSharp::MutationData
-  mutationName: Moonlit
+  mutationName: Bloody
   displaySymbol: 
-  sellMultiplier: 2
-  tintColor: {r: 0.60296756, g: 0.5613208, b: 1, a: 1}
+  sellMultiplier: 4
+  tintColor: {r: 0.8396226, g: 0.21782663, b: 0.21782663, a: 1}
   applyTint: 0
   sizeMultiplier: 1
   combinations: []

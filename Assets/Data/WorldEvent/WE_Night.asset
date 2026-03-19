@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d3c9b09cefbd274daf8b44b157af57b, type: 3}
+  m_Name: WE_Night
+  m_EditorClassIdentifier: Assembly-CSharp::WorldEventData
+  eventName: Night
+  priority: 2
+  duration: 600
+  skyboxMaterial: {fileID: 0}
+  useAmbientLight: 0
+  ambientLightColor: {r: 1, g: 1, b: 1, a: 1}
+  growthSpeedMultiplier: 1
+  mutationToApply: {fileID: 11400000, guid: 0d5025b7f4838ac4ea4a9faacdf61796, type: 2}
+  mutationChancePerCrop: 0
+  mutationIntervalSeconds: 40
+  maxCropsPerCycle: 5
+  hasRainVisual: 0
+  rainColor: {r: 0.7, g: 0.85, b: 1, a: 1}
+  hasMoon: 1
+  moonColor: {r: 1, g: 1, b: 1, a: 1}
+  hasStars: 1
+  canReplaceEvents: []
+  replaceChance: 0
+  startSound: {fileID: 0}
+  incompatibleWith: []

@@ -13,5 +13,6 @@ public enum SoundEvent
     InventoryFull,
     NoSeedSelected,
     MutationOccurred,
+    WateringCan,
     UIClick
 }

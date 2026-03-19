@@ -11,6 +11,7 @@ public class FarmPlot : MonoBehaviour
     public int                CurrentStage { get; private set; } = -1;
     public float              StageTimer   { get; private set; } = 0f;
     public bool               IsEvolved    { get; private set; } = false;
+    public bool               IsWatered    { get; private set; } = false;
     public bool               StateChanged { get; private set; }
     public List<MutationData> Mutations    { get; private set; } = new List<MutationData>();
 
@@ -20,6 +21,9 @@ public class FarmPlot : MonoBehaviour
     // ── Cached references ─────────────────────────────────────
     private FarmPlotVisual _visual;
 
+    // ── Per-plot speed from watering can ──────────────────────
+    private float _wateringSpeedMultiplier = 1f;
+
     // ── Hover state ───────────────────────────────────────────
     private bool _hasTriedPlantingThisHover = false;
 
@@ -27,9 +31,7 @@ public class FarmPlot : MonoBehaviour
     private static float _placementCooldownUntil = 0f;
 
     public static void SetPlacementCooldown(float duration = 0.15f)
-    {
-        _placementCooldownUntil = Time.time + duration;
-    }
+        => _placementCooldownUntil = Time.time + duration;
 
     private static bool PlacementCooldownActive =>
         Time.time < _placementCooldownUntil;
@@ -56,7 +58,10 @@ public class FarmPlot : MonoBehaviour
             return;
         }
 
-        StageTimer += Time.deltaTime;
+        // Combine watering speed and active world event growth speed
+        float speed = _wateringSpeedMultiplier *
+                      (WorldEventManager.Instance?.GrowthSpeedMultiplier ?? 1f);
+        StageTimer += Time.deltaTime * speed;
 
         GrowthStage stage        = ActiveCrop.growthStages[CurrentStage];
         bool        isFinalStage = CurrentStage == ActiveCrop.growthStages.Length - 1;
@@ -81,28 +86,41 @@ public class FarmPlot : MonoBehaviour
 
     public void ApplyMutation(MutationData mutation)
     {
-        if (mutation == null || Mutations.Contains(mutation)) return;
+        if (mutation == null) return;
 
-        // Check if this mutation combines with any existing ones
+        // Check for combinations first
         foreach (var existing in new List<MutationData>(Mutations))
         {
+            if (existing.combinations == null) continue;
             foreach (var combo in existing.combinations)
             {
-                if (combo.combinesWith == mutation)
-                {
-                    Mutations.Remove(existing);
-                    Mutations.Add(combo.resultsIn);
-                    StateChanged = true;
-                    TutorialConsole.Log($"{ActiveCrop?.cropName} is now " +
-                        $"{combo.resultsIn.mutationName}!");
-                    return;
-                }
+                if (combo.combinesWith != mutation || combo.resultsIn == null) continue;
+                // Skip if result is already present (prevents duplicates)
+                if (Mutations.Contains(combo.resultsIn)) return;
+                Mutations.Remove(existing);
+                Mutations.Add(combo.resultsIn);
+                StateChanged = true;
+                TutorialConsole.Log($"{ActiveCrop?.cropName} mutation combined into " +
+                    $"{combo.resultsIn.mutationName}!");
+                return;
             }
         }
 
+        // No combination — only add if not already present
+        if (Mutations.Contains(mutation)) return;
         Mutations.Add(mutation);
         StateChanged = true;
         TutorialConsole.Log($"{ActiveCrop?.cropName} is now {mutation.mutationName}!");
+    }
+
+    // ── Watering ──────────────────────────────────────────────
+
+    public void ApplyWatering()
+    {
+        if (IsWatered || State != PlotState.Growing) return;
+        IsWatered                = true;
+        _wateringSpeedMultiplier = 2f;
+        _visual?.ShowWateringEffect();
     }
 
     // ── Input ─────────────────────────────────────────────────
@@ -163,7 +181,10 @@ public class FarmPlot : MonoBehaviour
                 _hasTriedPlantingThisHover = true;
                 break;
             case PlotState.Growing:
-                float remaining = ActiveCrop.growthStages[CurrentStage].duration - StageTimer;
+                float speed = _wateringSpeedMultiplier *
+                              (WorldEventManager.Instance?.GrowthSpeedMultiplier ?? 1f);
+                float remaining = (ActiveCrop.growthStages[CurrentStage].duration
+                                   - StageTimer) / speed;
                 TutorialConsole.Log($"{ActiveCrop.cropName} — stage " +
                     $"{CurrentStage + 1}/{ActiveCrop.growthStages.Length}, " +
                     $"ready in {remaining:F1}s.");
@@ -211,19 +232,10 @@ public class FarmPlot : MonoBehaviour
     {
         var result = HarvestResolver.Resolve(ActiveCrop);
 
-        if (result.IsEvolved)
-        {
-            IsEvolved = true;
-            EventBus.Raise_MutationOccurred(this);
-            AudioManager.Play(SoundEvent.MutationOccurred);
-            TutorialConsole.Log(
-                $"<color={UIColors.RarityMythical_Hex}>Evolved! " +
-                $"{ActiveCrop.cropName} has evolved!</color>");
-        }
+        // IsEvolved is entirely hidden from players — no log, no notification
+        if (result.IsEvolved) IsEvolved = true;
 
-        // Pass active mutations to harvested crop
-        foreach (var m in Mutations)
-            result.Mutations.Add(m);
+        foreach (var m in Mutations) result.Mutations.Add(m);
 
         Inventory.Instance.AddHarvest(result);
         AudioManager.Play(SoundEvent.SeedHarvested);
@@ -231,10 +243,9 @@ public class FarmPlot : MonoBehaviour
         FloatingText.Spawn(
             $"+{result.SellValue}",
             transform.position + Vector3.up * 1.5f,
-            UIColors.FloatingGold,28);
+            UIColors.FloatingGold, 28);
 
-        TutorialConsole.Log($"Harvested {RankUtility.RankLabel(result.Rank)} " +
-            $"{result.DisplayName} — worth {result.SellValue} coins.");
+        TutorialConsole.Log($"Harvested {result.DisplayName} — worth {result.SellValue} coins.");
 
         _hasTriedPlantingThisHover = true;
         ResetState();
@@ -254,12 +265,16 @@ public class FarmPlot : MonoBehaviour
 
     void ResetState()
     {
-        ActiveCrop   = null;
-        CurrentStage = -1;
-        StageTimer   = 0f;
-        IsEvolved    = false;
+        ActiveCrop               = null;
+        CurrentStage             = -1;
+        StageTimer               = 0f;
+        IsEvolved                = false;
+        IsWatered                = false;
+        _wateringSpeedMultiplier = 1f;
         Mutations.Clear();
         State        = PlotState.Empty;
         StateChanged = true;
+
+        _visual?.ResetWateringColor();
     }
 }

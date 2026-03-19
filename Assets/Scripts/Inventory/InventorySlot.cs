@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using UnityEngine;
 
 public enum InventoryItemType { Empty, Seed, Harvest, Tool }
 
@@ -24,7 +23,7 @@ public class InventorySlot
 
     public string DisplayName => Type switch
     {
-        InventoryItemType.Seed    => $"{Crop.cropName}\nSeed x{SeedCount}",
+        InventoryItemType.Seed    => $"{Crop.cropName}\nx{SeedCount}",
         InventoryItemType.Harvest => $"{Crop.cropName}\nx{Harvested.Count}",
         InventoryItemType.Tool    => $"{Tool.toolName}\nx{ToolCount}",
         _                         => ""
@@ -46,5 +45,16 @@ public class InventorySlot
         SeedCount = 0;
         ToolCount = 0;
         Harvested.Clear();
+    }
+
+    // Swaps all contents between two slots — used by drag-drop
+    public static void Swap(InventorySlot a, InventorySlot b)
+    {
+        var tType = a.Type;      a.Type      = b.Type;      b.Type      = tType;
+        var tCrop = a.Crop;      a.Crop      = b.Crop;      b.Crop      = tCrop;
+        var tTool = a.Tool;      a.Tool      = b.Tool;      b.Tool      = tTool;
+        var tSeeds = a.SeedCount; a.SeedCount = b.SeedCount; b.SeedCount = tSeeds;
+        var tTools = a.ToolCount; a.ToolCount = b.ToolCount; b.ToolCount = tTools;
+        var tHarv = a.Harvested; a.Harvested = b.Harvested; b.Harvested = tHarv;
     }
 }

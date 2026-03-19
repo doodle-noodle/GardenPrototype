@@ -3,30 +3,34 @@ using System;
 public static class EventBus
 {
     // Economy
-    public static event Action<int>           OnCoinsChanged;
+    public static event Action<int>                OnCoinsChanged;
 
     // Inventory — seeds
-    public static event Action<CropData>      OnSeedAdded;
-    public static event Action<CropData>      OnSeedUsed;
+    public static event Action<CropData>           OnSeedAdded;
+    public static event Action<CropData>           OnSeedUsed;
 
     // Inventory — harvest
-    public static event Action<HarvestedCrop> OnCropHarvested;
-    public static event Action<HarvestedCrop> OnCropSold;
+    public static event Action<HarvestedCrop>      OnCropHarvested;
+    public static event Action<HarvestedCrop>      OnCropSold;
 
     // Inventory — tools
-    public static event Action<ToolData>      OnToolAdded;
-    public static event Action<ToolData>      OnToolUsed;
+    public static event Action<ToolData>           OnToolAdded;
+    public static event Action<ToolData>           OnToolUsed;
 
     // Shop
-    public static event Action                OnShopOpened;
-    public static event Action                OnShopClosed;
-    public static event Action                OnShopStockRefreshed;
+    public static event Action                     OnShopOpened;
+    public static event Action                     OnShopClosed;
+    public static event Action                     OnShopStockRefreshed;
 
     // Farm
-    public static event Action<FarmPlot>      OnPlotPlanted;
-    public static event Action<FarmPlot>      OnPlotReady;
-    public static event Action<FarmPlot>      OnPlotRemoved;
-    public static event Action<FarmPlot>      OnMutationOccurred;
+    public static event Action<FarmPlot>           OnPlotPlanted;
+    public static event Action<FarmPlot>           OnPlotReady;
+    public static event Action<FarmPlot>           OnPlotRemoved;
+    public static event Action<FarmPlot>           OnMutationOccurred;
+
+    // World Events
+    public static event Action<WorldEventData>     OnWorldEventStarted;
+    public static event Action<WorldEventData>     OnWorldEventEnded;
 
     // Dating
     public static event Action<HarvestedCrop, int> OnRelationshipChanged;
@@ -45,5 +49,7 @@ public static class EventBus
     public static void Raise_PlotReady(FarmPlot plot)                        => OnPlotReady?.Invoke(plot);
     public static void Raise_PlotRemoved(FarmPlot plot)                      => OnPlotRemoved?.Invoke(plot);
     public static void Raise_MutationOccurred(FarmPlot plot)                 => OnMutationOccurred?.Invoke(plot);
+    public static void Raise_WorldEventStarted(WorldEventData data)          => OnWorldEventStarted?.Invoke(data);
+    public static void Raise_WorldEventEnded(WorldEventData data)            => OnWorldEventEnded?.Invoke(data);
     public static void Raise_RelationshipChanged(HarvestedCrop crop, int lv) => OnRelationshipChanged?.Invoke(crop, lv);
 }

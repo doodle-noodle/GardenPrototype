@@ -6,17 +6,16 @@ public class InventoryHotbar : MonoBehaviour
 {
     public static InventoryHotbar Instance;
 
-    // ── Layout ────────────────────────────────────────────────
-    private const int   FontBody     = 20;
-    private const int   FontLabel    = 14;
-    private const float SlotW        = 80f;
-    private const float SlotH        = 72f;
-    private const float SlotSpacing  = 6f;
+    private const int   FontBody     = 14;
+    private const int   FontLabel    = 10;
+    private const float SlotSize     = 60f;
+    private const float SlotSpacing  = 5f;
     private const float PanelPadding = 10f;
     private const float BottomPad    = 20f;
-    private const float MaxWidthPct  = 0.9f;  // hotbar never exceeds 90% of screen width
+    private const float MaxWidthPct  = 0.9f;
+    private const float InvBtnSize   = 44f;
+    private const float InvBtnGap    = 10f;
 
-    // ── Slot sub-elements ─────────────────────────────────────
     private struct SlotElements
     {
         public Image           Background;
@@ -27,21 +26,14 @@ public class InventoryHotbar : MonoBehaviour
 
     private SlotElements[] slotElements;
 
-    // ── Stored event handlers — prevents lambda memory leaks ──
-    private System.Action<CropData>      _onSeedAdded;
-    private System.Action<CropData>      _onSeedUsed;
-    private System.Action<HarvestedCrop> _onCropHarvested;
-    private System.Action<HarvestedCrop> _onCropSold;
-    private System.Action<ToolData>      _onToolAdded;
-    private System.Action<ToolData>      _onToolUsed;
+    private System.Action<CropData>      _onSeedAdded, _onSeedUsed;
+    private System.Action<HarvestedCrop> _onCropHarvested, _onCropSold;
+    private System.Action<ToolData>      _onToolAdded, _onToolUsed;
     private System.Action                _onShopClosed;
-
-    // ── Lifecycle ─────────────────────────────────────────────
 
     void Awake()
     {
-        Instance = this;
-
+        Instance         = this;
         _onSeedAdded     = _ => Refresh();
         _onSeedUsed      = _ => Refresh();
         _onCropHarvested = _ => Refresh();
@@ -89,20 +81,19 @@ public class InventoryHotbar : MonoBehaviour
         Canvas canvas = FindFirstObjectByType<Canvas>();
         int    count  = Inventory.MaxSlots;
 
-        // Scale slots down if they would overflow the screen width
-        float totalFixed  = count * SlotW + (count - 1) * SlotSpacing + PanelPadding * 2f;
+        float totalFixed  = count * SlotSize + (count - 1) * SlotSpacing + PanelPadding * 2f;
         float maxWidth    = Screen.width * MaxWidthPct;
         float scaleFactor = totalFixed > maxWidth ? maxWidth / totalFixed : 1f;
-        float slotW       = SlotW * scaleFactor;
-        float slotH       = SlotH * scaleFactor;
-        int   bodyFont    = Mathf.Max(10, Mathf.RoundToInt(FontBody  * scaleFactor));
-        int   labelFont   = Mathf.Max(8,  Mathf.RoundToInt(FontLabel * scaleFactor));
+        float slotSz      = SlotSize  * scaleFactor;
+        int   bodyFont    = Mathf.Max(9, Mathf.RoundToInt(FontBody  * scaleFactor));
+        int   labelFont   = Mathf.Max(7, Mathf.RoundToInt(FontLabel * scaleFactor));
 
-        float panelW = count * slotW + (count - 1) * SlotSpacing + PanelPadding * 2f;
-        float panelH = slotH + PanelPadding * 2f;
+        float panelW = count * slotSz + (count - 1) * SlotSpacing + PanelPadding * 2f;
+        float panelH = slotSz + PanelPadding * 2f;
 
-        GameObject panel = new GameObject("InventoryHotbar", typeof(RectTransform),
-            typeof(CanvasRenderer), typeof(Image));
+        // ── Hotbar panel ──────────────────────────────────────
+        var panel = new GameObject("InventoryHotbar",
+            typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         panel.transform.SetParent(canvas.transform, false);
 
         var rt = panel.GetComponent<RectTransform>();
@@ -111,49 +102,94 @@ public class InventoryHotbar : MonoBehaviour
         rt.pivot            = new Vector2(0.5f, 0f);
         rt.anchoredPosition = new Vector2(0f, BottomPad);
         rt.sizeDelta        = new Vector2(panelW, panelH);
-        panel.GetComponent<Image>().color = UIColors.SlotPanel;
+
+        var panelImg           = panel.GetComponent<Image>();
+        panelImg.color         = UIColors.SlotPanel;
+        panelImg.raycastTarget = false;
 
         slotElements = new SlotElements[count];
-
         for (int i = 0; i < count; i++)
         {
-            float xPos = -((count - 1) * (slotW + SlotSpacing) * 0.5f)
-                         + i * (slotW + SlotSpacing);
-            slotElements[i] = BuildSlot(panel.transform, i, xPos, slotW, slotH,
+            float xPos = -(count - 1) * (slotSz + SlotSpacing) * 0.5f
+                         + i * (slotSz + SlotSpacing);
+            slotElements[i] = BuildSlot(panel.transform, i, xPos, slotSz,
                 bodyFont, labelFont);
         }
+
+        // ── Inventory button ──────────────────────────────────
+        float hotbarLeftEdge = -(panelW * 0.5f);
+        float invBtnX        = hotbarLeftEdge - InvBtnGap - InvBtnSize * 0.5f;
+
+        var invBtn = new GameObject("InventoryBtn",
+            typeof(RectTransform), typeof(CanvasRenderer),
+            typeof(Image), typeof(Button));
+        invBtn.transform.SetParent(canvas.transform, false);
+
+        var ibRt              = invBtn.GetComponent<RectTransform>();
+        ibRt.anchorMin        = new Vector2(0.5f, 0f);
+        ibRt.anchorMax        = new Vector2(0.5f, 0f);
+        ibRt.pivot            = new Vector2(0.5f, 0f);
+        ibRt.sizeDelta        = new Vector2(InvBtnSize, InvBtnSize);
+        ibRt.anchoredPosition = new Vector2(invBtnX, BottomPad);
+        invBtn.GetComponent<Image>().color = new Color(0.25f, 0.28f, 0.38f, 0.95f);
+
+        var ibLbl = new GameObject("L",
+            typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        ibLbl.transform.SetParent(invBtn.transform, false);
+        var ibLblRt         = ibLbl.GetComponent<RectTransform>();
+        ibLblRt.anchorMin   = Vector2.zero;
+        ibLblRt.anchorMax   = Vector2.one;
+        ibLblRt.sizeDelta   = Vector2.zero;
+        ibLblRt.anchoredPosition = Vector2.zero;
+        var ibTmp           = ibLbl.GetComponent<TextMeshProUGUI>();
+        ibTmp.text          = "INV";
+        ibTmp.fontSize      = 13f;
+        ibTmp.fontStyle     = FontStyles.Bold;
+        ibTmp.alignment     = TextAlignmentOptions.Center;
+        ibTmp.color         = Color.white;
+        ibTmp.raycastTarget = false;
+
+        invBtn.GetComponent<Button>().onClick.AddListener(() =>
+        {
+            CancelPlacementIfActive();
+            InventoryPanel.Instance?.Toggle();
+        });
+
+        InventoryPanel.Instance?.SetHotbarTopY(BottomPad + panelH);
     }
 
     SlotElements BuildSlot(Transform parent, int index, float xPos,
-        float slotW, float slotH, int bodyFont, int labelFont)
+        float slotSz, int bodyFont, int labelFont)
     {
-        GameObject root = new GameObject($"Slot_{index + 1}", typeof(RectTransform),
-            typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        var root = new GameObject($"Slot_{index + 1}",
+            typeof(RectTransform), typeof(CanvasRenderer),
+            typeof(Image), typeof(Button));
         root.transform.SetParent(parent, false);
 
-        var srt = root.GetComponent<RectTransform>();
+        var srt              = root.GetComponent<RectTransform>();
         srt.anchorMin        = new Vector2(0.5f, 0.5f);
         srt.anchorMax        = new Vector2(0.5f, 0.5f);
         srt.pivot            = new Vector2(0.5f, 0.5f);
-        srt.sizeDelta        = new Vector2(slotW, slotH);
+        srt.sizeDelta        = new Vector2(slotSz, slotSz);
         srt.anchoredPosition = new Vector2(xPos, 0f);
 
-        var mainLabel = MakeLabel(root.transform, "MainLabel",
-            new Vector2(0f, 4f), new Vector2(-4f, -20f),
-            bodyFont, TextAlignmentOptions.Center);
-        mainLabel.text  = $"[{index + 1}]";
-        mainLabel.color = UIColors.TextDim;
+        var img           = root.GetComponent<Image>();
+        img.raycastTarget = true;
 
-        var typeLabel = MakeLabel(root.transform, "TypeLabel",
-            new Vector2(0f, -slotH * 0.5f + 10f), new Vector2(-4f, 18f),
-            labelFont, TextAlignmentOptions.Center);
-        typeLabel.color = UIColors.TextDim;
+        var main = MakeLabel(root.transform, "M",
+            new Vector2(0f, 3f), new Vector2(-4f, -16f), bodyFont);
+        main.text  = $"[{index + 1}]";
+        main.color = UIColors.TextDim;
+
+        var tag = MakeLabel(root.transform, "T",
+            new Vector2(0f, -slotSz * 0.5f + 7f), new Vector2(-4f, 14f), labelFont);
+        tag.color = UIColors.TextDim;
 
         return new SlotElements
         {
-            Background = root.GetComponent<Image>(),
-            MainLabel  = mainLabel,
-            TypeLabel  = typeLabel,
+            Background = img,
+            MainLabel  = main,
+            TypeLabel  = tag,
             Btn        = root.GetComponent<Button>()
         };
     }
@@ -163,52 +199,46 @@ public class InventoryHotbar : MonoBehaviour
     public void Refresh()
     {
         if (slotElements == null) return;
-
         for (int i = 0; i < Inventory.MaxSlots; i++)
         {
-            InventorySlot slot = Inventory.Instance.Slots[i];
-            SlotElements  el   = slotElements[i];
-
+            var slot = Inventory.Instance.Slots[i];
+            var el   = slotElements[i];
             el.Btn.onClick.RemoveAllListeners();
 
-            if (slot.IsEmpty)
-                SetEmptySlot(el, i);
-            else if (slot.Type == InventoryItemType.Seed)
-                SetSeedSlot(el, slot, Inventory.Instance.SelectedSeed == slot.Crop);
-            else if (slot.Type == InventoryItemType.Harvest)
-                SetHarvestSlot(el, slot);
-            else if (slot.Type == InventoryItemType.Tool)
-                SetToolSlot(el, slot);
+            if (slot.IsEmpty)                                SetEmpty(el, i);
+            else if (slot.Type == InventoryItemType.Seed)    SetSeed(el, slot);
+            else if (slot.Type == InventoryItemType.Harvest) SetHarvest(el, slot);
+            else if (slot.Type == InventoryItemType.Tool)    SetTool(el, slot);
         }
     }
 
-    // ── Slot setters ──────────────────────────────────────────
-
-    void SetEmptySlot(SlotElements el, int index)
+    void SetEmpty(SlotElements el, int index)
     {
         el.Background.color = UIColors.SlotEmpty;
         el.MainLabel.text   = $"[{index + 1}]";
         el.MainLabel.color  = UIColors.TextDim;
         el.TypeLabel.text   = "";
+        el.Btn.onClick.AddListener(() => { Inventory.Instance.Deselect(); Refresh(); });
     }
 
-    void SetSeedSlot(SlotElements el, InventorySlot slot, bool isSelected)
+    void SetSeed(SlotElements el, InventorySlot slot)
     {
-        el.Background.color = isSelected ? UIColors.SlotSelected : UIColors.SlotSeed;
+        bool selected       = Inventory.Instance.SelectedSeed == slot.Crop;
+        el.Background.color = selected ? UIColors.SlotSelected : UIColors.SlotSeed;
         el.MainLabel.text   = $"{slot.Crop.cropName}\nx{slot.SeedCount}";
         el.MainLabel.color  = UIColors.TextPrimary;
         el.TypeLabel.text   = "SEED";
         el.TypeLabel.color  = UIColors.TagSeed;
-
-        CropData captured = slot.Crop;
+        CropData captured   = slot.Crop;
         el.Btn.onClick.AddListener(() =>
         {
+            CancelPlacementIfActive();
             Inventory.Instance.SelectSeed(captured);
             Refresh();
         });
     }
 
-    void SetHarvestSlot(SlotElements el, InventorySlot slot)
+    void SetHarvest(SlotElements el, InventorySlot slot)
     {
         el.Background.color = UIColors.SlotHarvest;
         el.MainLabel.text   = $"{slot.Crop.cropName}\nx{slot.Harvested.Count}";
@@ -217,56 +247,57 @@ public class InventoryHotbar : MonoBehaviour
         el.TypeLabel.color  = UIColors.TagHarvest;
     }
 
-    void SetToolSlot(SlotElements el, InventorySlot slot)
+    void SetTool(SlotElements el, InventorySlot slot)
     {
-        bool isSelected     = Inventory.Instance.SelectedSlot == slot;
-        el.Background.color = isSelected ? UIColors.SlotSelected : slot.Tool.toolColor;
-        el.MainLabel.text   = $"{slot.Tool.toolName}\nx{slot.ToolCount}";
+        bool selected       = Inventory.Instance.SelectedSlot == slot;
+        el.Background.color = selected ? UIColors.SlotSelected : slot.Tool.toolColor;
+        el.MainLabel.text   = slot.Tool.isConsumable
+                              ? $"{slot.Tool.toolName}\nx{slot.ToolCount}"
+                              : slot.Tool.toolName;
         el.MainLabel.color  = UIColors.TextPrimary;
         el.TypeLabel.text   = "TOOL";
         el.TypeLabel.color  = UIColors.TextPrimary;
-
-        ToolData captured = slot.Tool;
+        ToolData captured   = slot.Tool;
         el.Btn.onClick.AddListener(() =>
         {
+            CancelPlacementIfActive();
             Inventory.Instance.SelectTool(captured);
             Refresh();
         });
     }
-
-    // ── Number keys ───────────────────────────────────────────
 
     void HandleNumberKeys()
     {
         for (int i = 0; i < Inventory.MaxSlots && i < 9; i++)
         {
             if (!Input.GetKeyDown(KeyCode.Alpha1 + i)) continue;
+            CancelPlacementIfActive();
             Inventory.Instance.SelectSlot(i);
             Refresh();
         }
     }
 
-    // ── Helpers ───────────────────────────────────────────────
+    public static void CancelPlacementIfActive()
+    {
+        if (PlacementController.Instance != null &&
+            PlacementController.Instance.IsPlacing)
+            PlacementController.Instance.CancelPlacement();
+    }
 
     TextMeshProUGUI MakeLabel(Transform parent, string name,
-        Vector2 anchoredPos, Vector2 sizeDelta,
-        int fontSize, TextAlignmentOptions alignment)
+        Vector2 pos, Vector2 size, int fontSize)
     {
-        GameObject go = new GameObject(name, typeof(RectTransform),
-            typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        var go = new GameObject(name,
+            typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         go.transform.SetParent(parent, false);
-
         var rt = go.GetComponent<RectTransform>();
-        rt.anchorMin        = new Vector2(0f, 0f);
-        rt.anchorMax        = new Vector2(1f, 1f);
-        rt.sizeDelta        = sizeDelta;
-        rt.anchoredPosition = anchoredPos;
-
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.sizeDelta = size; rt.anchoredPosition = pos;
         var tmp = go.GetComponent<TextMeshProUGUI>();
-        tmp.fontSize  = fontSize;
-        tmp.alignment = alignment;
-        tmp.color     = UIColors.TextPrimary;
-
+        tmp.fontSize      = fontSize;
+        tmp.alignment     = TextAlignmentOptions.Center;
+        tmp.color         = UIColors.TextPrimary;
+        tmp.raycastTarget = false;
         return tmp;
     }
 }

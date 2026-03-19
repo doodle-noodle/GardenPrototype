@@ -15,7 +15,7 @@ MonoBehaviour:
   cropName: Tomato
   seedCost: 20
   sellValue: 80
-  rarity: 0
+  rarity: 3
   growthStages:
   - stageName: Seedling
     duration: 8

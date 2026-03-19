@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d3c9b09cefbd274daf8b44b157af57b, type: 3}
+  m_Name: WE_Frost
+  m_EditorClassIdentifier: Assembly-CSharp::WorldEventData
+  eventName: Frost
+  priority: 2
+  duration: 300
+  skyboxMaterial: {fileID: 0}
+  useAmbientLight: 0
+  ambientLightColor: {r: 1, g: 1, b: 1, a: 1}
+  growthSpeedMultiplier: 1.5
+  mutationToApply: {fileID: 11400000, guid: c563ac9f06ba00740888f4f689339464, type: 2}
+  mutationChancePerCrop: 0.1
+  mutationIntervalSeconds: 30
+  maxCropsPerCycle: 0
+  hasRainVisual: 1
+  rainColor: {r: 0.7, g: 0.85, b: 1, a: 1}
+  hasMoon: 0
+  moonColor: {r: 1, g: 1, b: 1, a: 1}
+  hasStars: 0
+  canReplaceEvents:
+  - {fileID: 11400000, guid: 9ebdd05d7b03ae54992d8b5f98e7312a, type: 2}
+  replaceChance: 0.25
+  startSound: {fileID: 0}
+  incompatibleWith:
+  - {fileID: 11400000, guid: 961e2b7d04b0a7f46929fbd74a899741, type: 2}

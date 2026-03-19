@@ -16,14 +16,10 @@ public class ToolUser : MonoBehaviour
     void Update()
     {
         if (ShopUI.IsOpen) return;
+        if (PlacementController.Instance != null &&
+            PlacementController.Instance.IsPlacing) return;
 
-        // Reset last hit when mouse button is released
-        if (Input.GetMouseButtonUp(0))
-        {
-            _lastHitCollider = null;
-            return;
-        }
-
+        if (Input.GetMouseButtonUp(0)) { _lastHitCollider = null; return; }
         if (!Input.GetMouseButton(0)) return;
 
         if (UnityEngine.EventSystems.EventSystem.current != null &&
@@ -34,33 +30,50 @@ public class ToolUser : MonoBehaviour
 
         Ray ray = _mainCamera.ScreenPointToRay(Input.mousePosition);
         if (!Physics.Raycast(ray, out RaycastHit hit, 200f)) return;
-
-        // Don't re-trigger on the same collider without moving away
         if (hit.collider == _lastHitCollider) return;
 
         FarmPlot plot = hit.collider.GetComponent<FarmPlot>();
         if (plot == null) return;
 
         _lastHitCollider = hit.collider;
-        UseTool(selected.Tool, plot);
+        bool success = UseTool(selected.Tool, plot);
+        if (success && selected.Tool.isConsumable)
+            Inventory.Instance.UseTool(selected.Tool);
     }
 
-    void UseTool(ToolData tool, FarmPlot plot)
+    bool UseTool(ToolData tool, FarmPlot plot)
     {
         switch (tool.toolType)
         {
-            case ToolType.Shovel:
-                UseShovel(tool, plot);
-                break;
+            case ToolType.Shovel:      return UseShovel(plot);
+            case ToolType.WateringCan: return UseWateringCan(plot);
+            default:                   return false;
         }
-
-        if (tool.isConsumable)
-            Inventory.Instance.UseTool(tool);
     }
 
-    void UseShovel(ToolData tool, FarmPlot plot)
+    bool UseShovel(FarmPlot plot)
     {
         plot.RemovePlot();
-        TutorialConsole.Log("Removed farm plot with shovel.");
+        AudioManager.Play(SoundEvent.PlotRemoved);
+        TutorialConsole.Log("Removed farm plot.");
+        return true;
+    }
+
+    bool UseWateringCan(FarmPlot plot)
+    {
+        if (plot.State != FarmPlot.PlotState.Growing)
+        {
+            TutorialConsole.Warn("Plant a seed first before watering.");
+            return false;
+        }
+        if (plot.IsWatered)
+        {
+            TutorialConsole.Warn("Already watered.");
+            return false;
+        }
+        plot.ApplyWatering();
+        AudioManager.Play(SoundEvent.WateringCan);
+        TutorialConsole.Log($"Watered {plot.ActiveCrop.cropName}! Growth speed doubled.");
+        return true;
     }
 }

@@ -1,46 +1,43 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 [System.Serializable]
 public class HarvestedCrop
 {
     public CropData           Source;
-    public Rank               Rank;
-    public bool               IsEvolved;
-    public List<MutationData> Mutations         = new List<MutationData>();
+    public bool               IsEvolved;    // hidden — reserved for future evolution feature
+    public List<MutationData> Mutations     = new List<MutationData>();
     public int                RelationshipLevel;
 
+    // Final Value = Base × IsEvolved bonus × M1 × M2 × M3 ...
     public int SellValue
     {
         get
         {
-            float multiplier = RankUtility.SellMultiplier(Rank);
-            multiplier *= IsEvolved ? 1.5f : 1f;
+            float value = Source.sellValue;
+            if (IsEvolved) value *= 1.5f;   // evolution bonus — invisible to player
             foreach (var m in Mutations)
-                multiplier *= m.sellMultiplier;
-            return (int)(Source.sellValue * multiplier);
+                value *= m.sellMultiplier;
+            return Mathf.Max(1, (int)value);
         }
     }
 
-    public string DisplayName =>
-        IsEvolved ? $"Evolved {Source.cropName}" : Source.cropName;
+    // Never shows "Evolved" prefix — IsEvolved is fully hidden from players
+    public string DisplayName => Source.cropName;
 
     public string MutationDisplay
     {
         get
         {
             if (Mutations == null || Mutations.Count == 0) return "";
-            var names = new List<string>();
-            foreach (var m in Mutations) names.Add(m.mutationName);
-            return string.Join(" + ", names);
+            return string.Join(" + ", Mutations.Select(m => m.mutationName));
         }
     }
 
-    public HarvestedCrop(CropData source, Rank rank, bool isEvolved)
+    public HarvestedCrop(CropData source, bool isEvolved)
     {
-        Source            = source;
-        Rank              = rank;
-        IsEvolved         = isEvolved;
-        RelationshipLevel = 0;
+        Source    = source;
+        IsEvolved = isEvolved;
     }
 }
