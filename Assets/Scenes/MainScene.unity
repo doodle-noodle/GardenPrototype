@@ -1973,6 +1973,7 @@ MonoBehaviour:
   allShopItems:
   - {fileID: 11400000, guid: 67106f1d674fb4443af0a7e9782099fc, type: 2}
   - {fileID: 11400000, guid: 08f66b793f5e3354b9a27762a71815d9, type: 2}
+  - {fileID: 11400000, guid: 96cb77f57380a7a4581dc288afe9c6fc, type: 2}
   - {fileID: 11400000, guid: 21050113fe85bd540bf8dc9754645290, type: 2}
   - {fileID: 11400000, guid: ff76b11e05b6f1d4dbb76867ae18a95e, type: 2}
   - {fileID: 11400000, guid: f4ef49bec3add794eaea07ec398533af, type: 2}

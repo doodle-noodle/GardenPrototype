@@ -10,31 +10,31 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 259e147521fc4e34e953efb332c42d83, type: 3}
-  m_Name: Carrot
+  m_Name: Pepper
   m_EditorClassIdentifier: Assembly-CSharp::CropData
-  cropName: Carrot
-  seedCost: 10
-  sellValue: 20
-  rarity: 0
+  cropName: Pepper
+  seedCost: 400
+  sellValue: 640
+  rarity: 1
   growthStages:
   - stageName: Seedling
-    duration: 4.5
+    duration: 20
     mutationBonus: 0
   - stageName: Sprout
-    duration: 4.5
+    duration: 20
     mutationBonus: 0
   - stageName: Mature
     duration: 0
     mutationBonus: 0
   stageVisuals:
-  - visualPrefab: {fileID: 8930729771582755542, guid: b913d30102176c144998f0fdfeab23ac, type: 3}
-    stageColor: {r: 0.5130571, g: 0.9150943, b: 0.2460395, a: 0}
+  - visualPrefab: {fileID: 6279142292225156367, guid: d2d1f126f7a32024ebfe6ee28a26ab55, type: 3}
+    stageColor: {r: 1, g: 0, b: 0, a: 0}
     scale: 0.6
-  - visualPrefab: {fileID: 6711131676016637848, guid: 6fb5df8f7e7a686418ace32041a308e5, type: 3}
-    stageColor: {r: 0.85634816, g: 0.9716981, b: 0.087086126, a: 0}
+  - visualPrefab: {fileID: 7935707879314010035, guid: 136b68516b22b5c438b32b611a83e550, type: 3}
+    stageColor: {r: 1, g: 0, b: 0, a: 0}
     scale: 0.6
-  - visualPrefab: {fileID: 4535986563268458021, guid: 497c9007f15752f438bdbf5c8ee5d2ad, type: 3}
-    stageColor: {r: 1, g: 0.6207221, b: 0, a: 0}
+  - visualPrefab: {fileID: 3271898378200159103, guid: 61dd4eb693accab4bb4694b54fd1a48d, type: 3}
+    stageColor: {r: 1, g: 0, b: 0, a: 0}
     scale: 0.6
   mutationChance: 0.05
   mutatesInto: {fileID: 0}
