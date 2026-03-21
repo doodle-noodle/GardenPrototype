@@ -38,7 +38,6 @@ public class DioramaCamera : MonoBehaviour
 
     void Start()
     {
-        // Auto-calculate pan bounds from grid size
         if (GridManager.Instance != null)
         {
             float w = GridManager.Instance.gridWidth  * GridManager.Instance.cellSize;
@@ -51,7 +50,6 @@ public class DioramaCamera : MonoBehaviour
         yaw        = transform.eulerAngles.y;
         targetZoom = zoomHeight;
 
-        // Derive look-at point from camera's current forward direction
         Ray ray = new Ray(transform.position, transform.forward);
         if (Physics.Raycast(ray, out RaycastHit hit))
         {
@@ -74,7 +72,12 @@ public class DioramaCamera : MonoBehaviour
 
     void Update()
     {
-        if (ShopUI.IsOpen) return;
+        // Freeze camera when any focus-capturing panel is open.
+        // Inventory: camera movement while browsing is jarring.
+        // Dialogue and Shop: camera must not respond to keyboard/mouse during these panels.
+        if (ShopUI.IsOpen)        return;
+        if (DialoguePanel.IsOpen) return;
+        if (InventoryPanel.IsOpen) return;
 
         HandleZoom();
         HandleKeyPan();

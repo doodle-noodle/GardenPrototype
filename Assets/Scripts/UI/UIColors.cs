@@ -45,7 +45,6 @@ public static class UIColors
     public static readonly Color ConsoleWarning = new Color(1.00f, 0.70f, 0.28f);
     public static readonly Color ConsoleError   = new Color(1.00f, 0.42f, 0.42f);
 
-    // Cached hex strings — avoids ToHex() call on every log
     public const string ConsoleWarning_Hex = "#FFB347";
     public const string ConsoleError_Hex   = "#FF6B6B";
 
@@ -71,4 +70,20 @@ public static class UIColors
     public static readonly Color TextDim       = new Color(1.00f, 1.00f, 1.00f, 0.25f);
     public static readonly Color PanelDark     = new Color(0.08f, 0.08f, 0.08f, 0.90f);
     public static readonly Color Transparent   = new Color(0.00f, 0.00f, 0.00f, 0.00f);
+
+    // ── World Event HUD ───────────────────────────────────────
+    public static readonly Color EventHudPanel = new Color(0.06f, 0.06f, 0.10f, 0.88f);
+    public static readonly Color EventHudBar   = new Color(0.20f, 0.55f, 0.45f, 1.00f);
+    public static readonly Color EventHudBarBg = new Color(0.10f, 0.10f, 0.14f, 1.00f);
+
+    // ── Dialogue Panel ────────────────────────────────────────
+    public static readonly Color DialoguePanel       = new Color(0.05f, 0.05f, 0.08f, 0.96f);
+    public static readonly Color DialoguePortrait    = new Color(0.18f, 0.18f, 0.25f, 1.00f);
+    public static readonly Color DialogueName        = new Color(0.95f, 0.80f, 0.45f, 1.00f);
+    public static readonly Color DialogueOption      = new Color(0.15f, 0.35f, 0.30f, 1.00f);
+    public static readonly Color DialogueOptionHover = new Color(0.22f, 0.50f, 0.42f, 1.00f);
+    public static readonly Color DialogueSeparator   = new Color(0.25f, 0.25f, 0.30f, 1.00f);
+
+    // ── Evolved character label (world-space, permanent) ──────
+    public static readonly Color EvolvedLabel = new Color(0.95f, 0.80f, 0.45f, 1.00f);
 }

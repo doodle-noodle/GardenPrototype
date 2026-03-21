@@ -5,6 +5,7 @@ using TMPro;
 public class InventoryPanel : MonoBehaviour
 {
     public static InventoryPanel Instance;
+    public static bool IsOpen { get; private set; }
 
     private const int   Cols      = 10;
     private const int   Rows      = 5;
@@ -147,7 +148,6 @@ public class InventoryPanel : MonoBehaviour
         img.color         = UIColors.SlotEmpty;
         img.raycastTarget = true;
 
-        // Drag handler — allows dragging to/from hotbar
         var drag       = go.AddComponent<InventoryDragHandler>();
         drag.IsHotbar  = false;
         drag.SlotIndex = index;
@@ -164,6 +164,7 @@ public class InventoryPanel : MonoBehaviour
     {
         if (!_built) return;
         _isOpen = !_isOpen;
+        IsOpen  = _isOpen;
         _panel.SetActive(_isOpen);
         if (_isOpen)
         {
@@ -178,6 +179,7 @@ public class InventoryPanel : MonoBehaviour
     {
         if (!_isOpen || _panel == null) return;
         _isOpen = false;
+        IsOpen  = false;
         _panel.SetActive(false);
     }
 
@@ -229,12 +231,12 @@ public class InventoryPanel : MonoBehaviour
         var rt = go.GetComponent<RectTransform>();
         rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
         rt.sizeDelta = size; rt.anchoredPosition = pos;
-        var tmp = go.GetComponent<TextMeshProUGUI>();
-        tmp.fontSize           = fontSize;
-        tmp.alignment          = TextAlignmentOptions.Center;
-        tmp.color              = UIColors.TextDim;
-        tmp.enableWordWrapping = true;
-        tmp.raycastTarget      = false;
+        var tmp               = go.GetComponent<TextMeshProUGUI>();
+        tmp.fontSize          = fontSize;
+        tmp.alignment         = TextAlignmentOptions.Center;
+        tmp.color             = UIColors.TextDim;
+        tmp.textWrappingMode  = TextWrappingModes.Normal; // replaces obsolete enableWordWrapping
+        tmp.raycastTarget     = false;
         return tmp;
     }
 }

@@ -124,7 +124,7 @@ public class InventoryDragHandler : MonoBehaviour,
         tmp.fontSize               = 11f;
         tmp.alignment              = TextAlignmentOptions.Center;
         tmp.color                  = Color.white;
-        tmp.enableWordWrapping     = true;
+        tmp.textWrappingMode       = TextWrappingModes.Normal;
         tmp.raycastTarget          = false;
     }
 

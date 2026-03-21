@@ -1,5 +1,5 @@
-﻿using UnityEngine;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using UnityEngine;
 
 [CreateAssetMenu(fileName = "NewMutation", menuName = "Garden/Mutation")]
 public class MutationData : ScriptableObject
@@ -8,13 +8,16 @@ public class MutationData : ScriptableObject
     public string mutationName;
     public string displaySymbol;    // optional short symbol e.g. "❄" for frozen
 
+    [Header("Tags")]
+    public List<string> tags = new List<string>();
+
     [Header("Economy")]
     public float  sellMultiplier = 1.5f;
 
     [Header("Visual")]
     public Color  tintColor      = Color.white;
     public bool   applyTint      = false;
-    public float  sizeMultiplier = 1f;        // 1 = no change
+    public float  sizeMultiplier = 1f;
 
     [Header("Combinations — when this mutation meets another")]
     public List<MutationCombination> combinations;
@@ -23,6 +26,6 @@ public class MutationData : ScriptableObject
 [System.Serializable]
 public class MutationCombination
 {
-    public MutationData combinesWith;   // the other mutation needed
-    public MutationData resultsIn;      // what both are replaced with
+    public MutationData combinesWith;
+    public MutationData resultsIn;
 }

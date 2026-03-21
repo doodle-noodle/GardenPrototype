@@ -1,10 +1,14 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 
 [CreateAssetMenu(fileName = "NewPlaceable", menuName = "Garden/Placeable Data")]
 public class PlaceableData : ScriptableObject, IShopable
 {
     [Header("Identity")]
     public string placeableName;
+
+    [Header("Tags")]
+    public List<string> tags = new List<string>();
 
     [Header("Placement")]
     public GameObject prefab;

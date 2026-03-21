@@ -14,5 +14,7 @@ public enum SoundEvent
     NoSeedSelected,
     MutationOccurred,
     WateringCan,
-    UIClick
+    UIClick,
+    DialogueOpen,
+    DialogueClose
 }

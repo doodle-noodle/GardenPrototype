@@ -8,22 +8,21 @@ public class HarvestedCrop
     public CropData           Source;
     public bool               IsEvolved;    // hidden — reserved for future evolution feature
     public List<MutationData> Mutations     = new List<MutationData>();
-    public int                RelationshipLevel;
 
-    // Final Value = Base × IsEvolved bonus × M1 × M2 × M3 ...
+    // Final Value = Base × IsEvolved bonus × M1.sellMultiplier × M2.sellMultiplier × ...
     public int SellValue
     {
         get
         {
             float value = Source.sellValue;
-            if (IsEvolved) value *= 1.5f;   // evolution bonus — invisible to player
+            if (IsEvolved) value *= 1.5f;
             foreach (var m in Mutations)
                 value *= m.sellMultiplier;
             return Mathf.Max(1, (int)value);
         }
     }
 
-    // Never shows "Evolved" prefix — IsEvolved is fully hidden from players
+    // Never shows "Evolved" — IsEvolved is fully hidden from players
     public string DisplayName => Source.cropName;
 
     public string MutationDisplay

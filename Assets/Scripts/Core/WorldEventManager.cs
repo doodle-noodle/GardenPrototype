@@ -9,6 +9,11 @@ public class WorldEventManager : MonoBehaviour
     public WorldEventDatabase database;
     public WorldEventData     defaultEvent;
 
+    [Header("World")]
+    [Tooltip("The active world/biome. Provides default soil and content lists. " +
+             "World-switching UI is planned for a future version.")]
+    public WorldData currentWorld;
+
     [Header("Auto Scheduling")]
     public float eventCheckInterval = 120f;
     [Range(0f, 1f)]
@@ -20,7 +25,9 @@ public class WorldEventManager : MonoBehaviour
     private Color    _defaultAmbientLight;
 
     private RainSystem _rainSystem;
-    // CelestialSystem temporarily disabled for diagnosis
+    // CelestialSystem removed — a safe replacement will be built in a future session
+
+    // ── Public API ────────────────────────────────────────────
 
     public float GrowthSpeedMultiplier
     {
@@ -33,11 +40,16 @@ public class WorldEventManager : MonoBehaviour
         }
     }
 
+    // Read-only access for WorldEventHUD and any future systems — preserves encapsulation
+    public IReadOnlyList<ActiveWorldEvent> ActiveEvents => _activeEvents;
+
     public bool IsEventActive(WorldEventData data)
     {
         if (data == null) return false;
         return _activeEvents.Exists(e => e?.Data == data);
     }
+
+    // ── Lifecycle ─────────────────────────────────────────────
 
     void Awake()
     {
@@ -45,7 +57,6 @@ public class WorldEventManager : MonoBehaviour
         _defaultSkybox       = RenderSettings.skybox;
         _defaultAmbientLight = RenderSettings.ambientLight;
         _rainSystem          = gameObject.AddComponent<RainSystem>();
-        // CelestialSystem NOT added — testing if this was blocking UI
     }
 
     void Start()
@@ -54,7 +65,8 @@ public class WorldEventManager : MonoBehaviour
         if (defaultEvent != null)
             ActivateEvent(defaultEvent);
         else
-            Debug.LogWarning("WorldEventManager: defaultEvent not assigned in Inspector.");
+            Debug.LogWarning("WorldEventManager: defaultEvent not assigned in Inspector. " +
+                "GrowthSpeedMultiplier will throw NullReferenceException every frame.");
     }
 
     void Update()
@@ -62,6 +74,8 @@ public class WorldEventManager : MonoBehaviour
         TickActiveEvents();
         TickScheduler();
     }
+
+    // ── Scheduling ────────────────────────────────────────────
 
     void TickScheduler()
     {
@@ -143,6 +157,8 @@ public class WorldEventManager : MonoBehaviour
         return true;
     }
 
+    // ── Tick ──────────────────────────────────────────────────
+
     void TickActiveEvents()
     {
         for (int i = _activeEvents.Count - 1; i >= 0; i--)
@@ -165,6 +181,8 @@ public class WorldEventManager : MonoBehaviour
             if (active.RemainingTime <= 0f) EndEvent(active.Data);
         }
     }
+
+    // ── Mutations ─────────────────────────────────────────────
 
     void ApplyMutationToCrops(WorldEventData data)
     {
@@ -198,9 +216,11 @@ public class WorldEventManager : MonoBehaviour
         }
     }
 
+    // ── Skybox & Visuals ──────────────────────────────────────
+
     void ApplySkybox()
     {
-        WorldEventData skyboxWinner = null;
+        WorldEventData skyboxWinner  = null;
         WorldEventData ambientWinner = null;
         int highest = -1;
 
@@ -230,7 +250,6 @@ public class WorldEventManager : MonoBehaviour
         var   rainEvent = _activeEvents.Find(e => e?.Data?.hasRainVisual == true);
         Color rainColor = rainEvent?.Data?.rainColor ?? new Color(0.7f, 0.85f, 1f);
         _rainSystem?.SetRain(hasRain, rainColor);
-        // Celestial effects disabled — re-enable after UI click issue is resolved
     }
 }
 

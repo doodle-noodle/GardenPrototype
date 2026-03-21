@@ -1,0 +1,51 @@
+title: Carrot_Intro
+---
+// This node runs the first time the player clicks a Carrot that has evolved.
+// <<addRelationship N>> modifies the relationship point total via RelationshipManager.
+// get_relationship() returns the current relationship level (int) for conditionals.
+
+Carrot: Oh! Hello there, farmer. I didn't expect to wake up like... this.
+
+-> You look amazing!
+    <<addRelationship 10>>
+    Carrot: You're too kind! I feel so alive!
+-> What are you exactly?
+    <<addRelationship 5>>
+    Carrot: A fair question. I was a carrot. Now I'm something... more.
+-> You look delicious.
+    <<addRelationship -5>>
+    Carrot: That is incredibly rude. Please don't say that again.
+
+// Branch based on current relationship level after the choice above
+<<if get_relationship() >= 1>>
+    Carrot: I have a feeling we're going to get along well, farmer.
+<<else>>
+    Carrot: I hope we can still be friends someday.
+<<endif>>
+
+===
+
+title: Carrot_Return
+---
+// Use this node for repeat visits. Set yarnStartNode to this after first meeting,
+// or use Yarn variables to track whether the intro has played.
+
+<<if get_relationship() >= 3>>
+    Carrot: Always good to see you. The soil feels warm today.
+<<elseif get_relationship() >= 1>>
+    Carrot: Hello again, farmer. How are the crops?
+<<else>>
+    Carrot: Oh. It's you. Hello.
+<<endif>>
+
+-> Looks like rain today.
+    <<addRelationship 3>>
+    Carrot: I do love the rain. Good for growing.
+-> I wanted to check in on you.
+    <<addRelationship 8>>
+    Carrot: That's... genuinely sweet. Thank you.
+-> I just need the plot back.
+    <<addRelationship -15>>
+    Carrot: I see. Well. I'll try not to take that personally.
+
+===
