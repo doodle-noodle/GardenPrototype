@@ -1,8 +1,5 @@
 using UnityEngine;
 
-// Assigned to a CropData to make it evolvable into a character.
-// One asset per evolvable crop — e.g. CharacterData_Carrot.
-// Stored in Assets/Data/Characters/
 [CreateAssetMenu(fileName = "NewCharacter", menuName = "Garden/Character Data")]
 public class CharacterData : ScriptableObject
 {
@@ -10,21 +7,24 @@ public class CharacterData : ScriptableObject
     public string characterName;
 
     [Header("Portrait")]
-    public Sprite portraitSprite;         // idle portrait shown in dialogue panel
-    public Sprite portraitSpriteTalking;  // optional alternate frame while text is revealing
+    public Sprite portraitSprite;
+    public Sprite portraitSpriteTalking;
 
     [Header("Dialogue")]
-    [Tooltip("The Yarn node title to run when this character is clicked. " +
-             "Must match a node title in the shared YarnProject.")]
+    [Tooltip("Yarn node title shown when player clicks an Evolved plot.")]
     public string yarnStartNode;
+
+    [Tooltip("Yarn node title for the evolution cutscene shown after player confirms evolution. " +
+             "If blank, evolution completes immediately without a cutscene node.")]
+    public string evolutionYarnNode;
 
     [Header("Relationship")]
     public int   maxRelationshipLevel = 10;
     [Tooltip("Points required to reach each level. Length must equal maxRelationshipLevel.")]
-    public int[] pointThresholds;         // e.g. [10, 25, 50, 80, 120 ...]
+    public int[] pointThresholds;
 
     [Header("Visual")]
-    [Tooltip("Optional model prefab shown when plot is Evolved. " +
+    [Tooltip("Optional model override shown in PlotState.Evolved. " +
              "If null, the crop's mature stageVisual prefab is kept.")]
     public GameObject evolvedModelPrefab;
 }

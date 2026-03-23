@@ -50,16 +50,16 @@ MonoBehaviour:
     Volume: 0.5
     PitchVariance: 1.05
   - Event: 9
-    Clip: {fileID: 8300000, guid: 5491977c84bebe5429802813ebe01b05, type: 3}
+    Clip: {fileID: 8300000, guid: b2a44b410e48cbc4381916520f9fffde, type: 3}
     Volume: 0.4
     PitchVariance: 1
   - Event: 12
-    Clip: {fileID: 8300000, guid: 6927e00031536f94e9b9e24ee6f2fe55, type: 3}
-    Volume: 0.5
+    Clip: {fileID: 0}
+    Volume: 0.1
     PitchVariance: 1
   - Event: 13
-    Clip: {fileID: 8300000, guid: b2a44b410e48cbc4381916520f9fffde, type: 3}
-    Volume: 0.4
+    Clip: {fileID: 8300000, guid: 6927e00031536f94e9b9e24ee6f2fe55, type: 3}
+    Volume: 0.3
     PitchVariance: 1
   - Event: 11
     Clip: {fileID: 0}

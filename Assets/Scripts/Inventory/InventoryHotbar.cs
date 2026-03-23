@@ -2,284 +2,314 @@
 using UnityEngine.UI;
 using TMPro;
 
+// Renders the hotbar strip with background bar, slot number labels, and the INV button.
+// All three elements are Canvas siblings — none are children of each other.
+//
+// Selected slot → thin green border (outline Image added BEFORE background Image as a child,
+//                  so it renders behind and peeks out around the edges)
+// Click occupied slot  → always equip (no toggle-off)
+// Click empty slot     → deselect (empty hands)
+// Press number key 1-0 → same logic via Inventory.SelectSlot
 public class InventoryHotbar : MonoBehaviour
 {
     public static InventoryHotbar Instance;
 
-    private const int   FontBody     = 14;
-    private const int   FontLabel    = 10;
-    private const float SlotSize     = 60f;
-    private const float SlotSpacing  = 5f;
-    private const float PanelPadding = 10f;
-    private const float BottomPad    = 20f;
-    private const float MaxWidthPct  = 0.9f;
-    private const float InvBtnSize   = 44f;
-    private const float InvBtnGap    = 10f;
+    // ── Layout ──────────────────────────────────────────────────
+    private const int   SlotCount   = Inventory.MaxSlots;
+    private const float SlotSize    = 70f;
+    private const float SlotGap     = 6f;
+    private const float BarPadX     = 8f;
+    private const float BarPadY     = 8f;
+    private const float BarBottomY  = 10f;
+    private const float InvBtnSize  = 45f;
+    private const float InvBtnGap   = 8f;
+    private const float OutlinePx   = 3f;  // how far the outline peeks out from behind the background
 
-    private struct SlotElements
+    // ── Unified font sizes ───────────────────────────────────────
+    private const int FontUI   = 16;
+    private const int FontItem = 18;
+    private const int FontTag  = 13;
+
+    private struct SlotEl
     {
-        public Image           Background;
-        public TextMeshProUGUI MainLabel;
-        public TextMeshProUGUI TypeLabel;
-        public Button          Btn;
+        public RectTransform   Rt;
+        public Image           Outline;     // green Image added first → renders behind Bg
+        public Image           Bg;          // background Image added second → renders in front
+        public TextMeshProUGUI Main;
+        public TextMeshProUGUI Tag;
+        public TextMeshProUGUI Num;
     }
 
-    private SlotElements[] slotElements;
+    private SlotEl[]   _slots;
+    private GameObject _bar;
+    private float      _barTopY;
+    private bool       _built;
 
-    private System.Action<CropData>      _onSeedAdded, _onSeedUsed;
-    private System.Action<HarvestedCrop> _onCropHarvested, _onCropSold;
-    private System.Action<ToolData>      _onToolAdded, _onToolUsed;
-    private System.Action                _onShopClosed;
-
-    void Awake()
-    {
-        Instance         = this;
-        _onSeedAdded     = _ => Refresh();
-        _onSeedUsed      = _ => Refresh();
-        _onCropHarvested = _ => Refresh();
-        _onCropSold      = _ => Refresh();
-        _onToolAdded     = _ => Refresh();
-        _onToolUsed      = _ => Refresh();
-        _onShopClosed    = Refresh;
-
-        EventBus.OnSeedAdded     += _onSeedAdded;
-        EventBus.OnSeedUsed      += _onSeedUsed;
-        EventBus.OnCropHarvested += _onCropHarvested;
-        EventBus.OnCropSold      += _onCropSold;
-        EventBus.OnToolAdded     += _onToolAdded;
-        EventBus.OnToolUsed      += _onToolUsed;
-        EventBus.OnShopClosed    += _onShopClosed;
-    }
-
-    void OnDestroy()
-    {
-        EventBus.OnSeedAdded     -= _onSeedAdded;
-        EventBus.OnSeedUsed      -= _onSeedUsed;
-        EventBus.OnCropHarvested -= _onCropHarvested;
-        EventBus.OnCropSold      -= _onCropSold;
-        EventBus.OnToolAdded     -= _onToolAdded;
-        EventBus.OnToolUsed      -= _onToolUsed;
-        EventBus.OnShopClosed    -= _onShopClosed;
-    }
+    void Awake() { Instance = this; }
 
     void Start()
     {
-        BuildHotbar();
+        var canvas = FindFirstObjectByType<Canvas>();
+        if (canvas == null) { Debug.LogError("InventoryHotbar: no Canvas in scene."); return; }
+
+        BuildBar(canvas.transform);
+        BuildInvButton(canvas.transform);
+        BuildSlots(canvas.transform);
+
+        _built = true;
         Refresh();
+
+        InventoryPanel.Instance?.SetHotbarTopY(_barTopY);
+
+        EventBus.OnSeedAdded     += _ => Refresh();
+        EventBus.OnSeedUsed      += _ => Refresh();
+        EventBus.OnCropHarvested += _ => Refresh();
+        EventBus.OnToolAdded     += _ => Refresh();
+        EventBus.OnToolUsed      += _ => Refresh();
     }
 
-    void Update()
+    // ── Background bar ───────────────────────────────────────────
+
+    void BuildBar(Transform canvasParent)
     {
-        if (ShopUI.IsOpen) return;
-        HandleNumberKeys();
-    }
+        float totalSlotsW = SlotCount * SlotSize + (SlotCount - 1) * SlotGap;
+        float barW        = totalSlotsW + BarPadX * 2f;
+        float barH        = SlotSize    + BarPadY * 2f;
 
-    void BuildHotbar()
-    {
-        Canvas canvas = FindFirstObjectByType<Canvas>();
-        int    count  = Inventory.MaxSlots;
-
-        float totalFixed  = count * SlotSize + (count - 1) * SlotSpacing + PanelPadding * 2f;
-        float maxWidth    = Screen.width * MaxWidthPct;
-        float scaleFactor = totalFixed > maxWidth ? maxWidth / totalFixed : 1f;
-        float slotSz      = SlotSize  * scaleFactor;
-        int   bodyFont    = Mathf.Max(9, Mathf.RoundToInt(FontBody  * scaleFactor));
-        int   labelFont   = Mathf.Max(7, Mathf.RoundToInt(FontLabel * scaleFactor));
-
-        float panelW = count * slotSz + (count - 1) * SlotSpacing + PanelPadding * 2f;
-        float panelH = slotSz + PanelPadding * 2f;
-
-        var panel = new GameObject("InventoryHotbar",
+        _bar = new GameObject("HotbarBar",
             typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-        panel.transform.SetParent(canvas.transform, false);
+        _bar.transform.SetParent(canvasParent, false);
 
-        var rt              = panel.GetComponent<RectTransform>();
+        var rt              = _bar.GetComponent<RectTransform>();
         rt.anchorMin        = new Vector2(0.5f, 0f);
         rt.anchorMax        = new Vector2(0.5f, 0f);
         rt.pivot            = new Vector2(0.5f, 0f);
-        rt.anchoredPosition = new Vector2(0f, BottomPad);
-        rt.sizeDelta        = new Vector2(panelW, panelH);
+        rt.sizeDelta        = new Vector2(barW, barH);
+        rt.anchoredPosition = new Vector2(0f, BarBottomY);
 
-        var panelImg           = panel.GetComponent<Image>();
-        panelImg.color         = UIColors.SlotPanel;
-        panelImg.raycastTarget = false;
+        var c             = UIColors.SlotEmpty;
+        var img           = _bar.GetComponent<Image>();
+        img.color         = new Color(c.r, c.g, c.b, 0.90f);
+        img.raycastTarget = false;
 
-        slotElements = new SlotElements[count];
-        for (int i = 0; i < count; i++)
-        {
-            float xPos = -(count - 1) * (slotSz + SlotSpacing) * 0.5f
-                         + i * (slotSz + SlotSpacing);
-            slotElements[i] = BuildSlot(panel.transform, i, xPos, slotSz,
-                bodyFont, labelFont);
-        }
-
-        // Inventory button — separate sibling, left of hotbar
-        float hotbarLeftEdge = -(panelW * 0.5f);
-        float invBtnX        = hotbarLeftEdge - InvBtnGap - InvBtnSize * 0.5f;
-
-        var invBtn = new GameObject("InventoryBtn",
-            typeof(RectTransform), typeof(CanvasRenderer),
-            typeof(Image), typeof(Button));
-        invBtn.transform.SetParent(canvas.transform, false);
-
-        var ibRt              = invBtn.GetComponent<RectTransform>();
-        ibRt.anchorMin        = new Vector2(0.5f, 0f);
-        ibRt.anchorMax        = new Vector2(0.5f, 0f);
-        ibRt.pivot            = new Vector2(0.5f, 0f);
-        ibRt.sizeDelta        = new Vector2(InvBtnSize, InvBtnSize);
-        ibRt.anchoredPosition = new Vector2(invBtnX, BottomPad);
-        invBtn.GetComponent<Image>().color = new Color(0.25f, 0.28f, 0.38f, 0.95f);
-
-        var ibLbl = new GameObject("L",
-            typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
-        ibLbl.transform.SetParent(invBtn.transform, false);
-        var ibLblRt         = ibLbl.GetComponent<RectTransform>();
-        ibLblRt.anchorMin   = Vector2.zero;
-        ibLblRt.anchorMax   = Vector2.one;
-        ibLblRt.sizeDelta   = Vector2.zero;
-        ibLblRt.anchoredPosition = Vector2.zero;
-        var ibTmp           = ibLbl.GetComponent<TextMeshProUGUI>();
-        ibTmp.text          = "INV";
-        ibTmp.fontSize      = 13f;
-        ibTmp.fontStyle     = FontStyles.Bold;
-        ibTmp.alignment     = TextAlignmentOptions.Center;
-        ibTmp.color         = Color.white;
-        ibTmp.raycastTarget = false;
-
-        invBtn.GetComponent<Button>().onClick.AddListener(() =>
-        {
-            CancelPlacementIfActive();
-            InventoryPanel.Instance?.Toggle();
-        });
-
-        InventoryPanel.Instance?.SetHotbarTopY(BottomPad + panelH);
+        _barTopY = BarBottomY + barH;
     }
 
-    SlotElements BuildSlot(Transform parent, int index, float xPos,
-        float slotSz, int bodyFont, int labelFont)
+    // ── INV button ───────────────────────────────────────────────
+
+    void BuildInvButton(Transform canvasParent)
     {
-        var root = new GameObject($"Slot_{index + 1}",
-            typeof(RectTransform), typeof(CanvasRenderer),
-            typeof(Image), typeof(Button));
-        root.transform.SetParent(parent, false);
+        float barW = SlotCount * SlotSize + (SlotCount - 1) * SlotGap + BarPadX * 2f;
 
-        var srt              = root.GetComponent<RectTransform>();
-        srt.anchorMin        = new Vector2(0.5f, 0.5f);
-        srt.anchorMax        = new Vector2(0.5f, 0.5f);
-        srt.pivot            = new Vector2(0.5f, 0.5f);
-        srt.sizeDelta        = new Vector2(slotSz, slotSz);
-        srt.anchoredPosition = new Vector2(xPos, 0f);
+        var go = new GameObject("InvButton",
+            typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        go.transform.SetParent(canvasParent, false);
 
-        var img           = root.GetComponent<Image>();
-        img.raycastTarget = true;
+        var rt              = go.GetComponent<RectTransform>();
+        rt.anchorMin        = new Vector2(0.5f, 0f);
+        rt.anchorMax        = new Vector2(0.5f, 0f);
+        rt.pivot            = new Vector2(1f, 0f);
+        rt.sizeDelta        = new Vector2(InvBtnSize, InvBtnSize);
+        rt.anchoredPosition = new Vector2(-barW * 0.5f - InvBtnGap, BarBottomY);
 
-        // Drag handler — allows dragging slots to inventory panel and back
-        var drag       = root.AddComponent<InventoryDragHandler>();
+        var c             = UIColors.SlotEmpty;
+        go.GetComponent<Image>().color = new Color(c.r, c.g, c.b, 0.90f);
+        go.GetComponent<Button>().onClick.AddListener(() => InventoryPanel.Instance?.Toggle());
+
+        var lbl = new GameObject("Label",
+            typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        lbl.transform.SetParent(go.transform, false);
+        var lrt              = lbl.GetComponent<RectTransform>();
+        lrt.anchorMin        = Vector2.zero;
+        lrt.anchorMax        = Vector2.one;
+        lrt.offsetMin        = Vector2.zero;
+        lrt.offsetMax        = Vector2.zero;
+        var tmp              = lbl.GetComponent<TextMeshProUGUI>();
+        tmp.text             = "INV";
+        tmp.fontSize         = FontUI;
+        tmp.fontStyle        = FontStyles.Bold;
+        tmp.alignment        = TextAlignmentOptions.Center;
+        tmp.color            = UIColors.TextPrimary;
+        tmp.raycastTarget    = false;
+        tmp.textWrappingMode = TextWrappingModes.NoWrap;
+    }
+
+    // ── Slot GameObjects ─────────────────────────────────────────
+
+    void BuildSlots(Transform canvasParent)
+    {
+        _slots = new SlotEl[SlotCount];
+        float totalSlotsW = SlotCount * SlotSize + (SlotCount - 1) * SlotGap;
+        float startX      = -totalSlotsW * 0.5f + SlotSize * 0.5f;
+        float slotBottomY = BarBottomY + BarPadY;
+
+        for (int i = 0; i < SlotCount; i++)
+            _slots[i] = BuildSlot(canvasParent, i, startX + i * (SlotSize + SlotGap), slotBottomY);
+    }
+
+    SlotEl BuildSlot(Transform canvasParent, int index, float x, float bottomY)
+    {
+        // Slot container — has Button and DragHandler but NO Image of its own.
+        // Children provide all visuals. This allows children to render in front of each other
+        // in insertion order (first child = behind, last child = in front).
+        var go = new GameObject($"HotbarSlot{index}",
+            typeof(RectTransform), typeof(Button));
+        go.transform.SetParent(canvasParent, false);
+
+        var rt              = go.GetComponent<RectTransform>();
+        rt.anchorMin        = new Vector2(0.5f, 0f);
+        rt.anchorMax        = new Vector2(0.5f, 0f);
+        rt.pivot            = new Vector2(0.5f, 0f);
+        rt.sizeDelta        = new Vector2(SlotSize, SlotSize);
+        rt.anchoredPosition = new Vector2(x, bottomY);
+
+        int captured = index;
+        go.GetComponent<Button>().onClick.AddListener(() => { SelectSlot(captured); Refresh(); });
+
+        var drag       = go.AddComponent<InventoryDragHandler>();
         drag.IsHotbar  = true;
         drag.SlotIndex = index;
 
-        var main = MakeLabel(root.transform, "M",
-            new Vector2(0f, 3f), new Vector2(-4f, -16f), bodyFont);
-        main.text  = $"[{index + 1}]";
-        main.color = UIColors.TextDim;
+        // ── CHILD 1: Outline Image — added FIRST so it renders BEHIND the background.
+        // Its rect is OutlinePx larger on every side, so it peeks out as a border.
+        // Hidden by default; shown when this slot is selected.
+        var outlineGo = new GameObject("Outline",
+            typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        outlineGo.transform.SetParent(go.transform, false);
+        var ort           = outlineGo.GetComponent<RectTransform>();
+        ort.anchorMin     = Vector2.zero;
+        ort.anchorMax     = Vector2.one;
+        ort.offsetMin     = new Vector2(-OutlinePx, -OutlinePx);  // expand beyond parent bounds
+        ort.offsetMax     = new Vector2( OutlinePx,  OutlinePx);
+        var outlineImg           = outlineGo.GetComponent<Image>();
+        outlineImg.color         = UIColors.SlotSelected;
+        outlineImg.raycastTarget = false;
+        outlineGo.SetActive(false);
 
-        var tag = MakeLabel(root.transform, "T",
-            new Vector2(0f, -slotSz * 0.5f + 7f), new Vector2(-4f, 14f), labelFont);
-        tag.color = UIColors.TextDim;
+        // ── CHILD 2: Background Image — added SECOND so it renders IN FRONT of the outline.
+        // It fills the slot exactly, covering the outline's centre and leaving only its
+        // outer edges visible as a border.
+        var bgGo = new GameObject("Background",
+            typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        bgGo.transform.SetParent(go.transform, false);
+        var bgRt       = bgGo.GetComponent<RectTransform>();
+        bgRt.anchorMin = Vector2.zero;
+        bgRt.anchorMax = Vector2.one;
+        bgRt.offsetMin = Vector2.zero;
+        bgRt.offsetMax = Vector2.zero;
+        var bgImg           = bgGo.GetComponent<Image>();
+        bgImg.color         = UIColors.SlotEmpty;
+        bgImg.raycastTarget = true;  // this child receives clicks, which bubble up to the Button
 
-        return new SlotElements
+        // ── Slot number — visible on empty slots only
+        string numLabel = index < 9 ? (index + 1).ToString() : "0";
+        var    numTmp   = MakeTMP(go.transform, "Num",
+                              Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, FontUI);
+        numTmp.text      = numLabel;
+        numTmp.alignment = TextAlignmentOptions.Center;
+        numTmp.color     = new Color(1f, 1f, 1f, 0.28f);
+
+        // ── Item name / count
+        var mainTmp = MakeTMP(go.transform, "Main",
+            new Vector2(0f, 0.28f), new Vector2(1f, 1f),
+            new Vector2(-4f, 0f), new Vector2(0f, 2f), FontItem);
+        mainTmp.alignment        = TextAlignmentOptions.Center;
+        mainTmp.enableAutoSizing = true;
+        mainTmp.fontSizeMin      = 9f;
+        mainTmp.fontSizeMax      = FontItem;
+
+        // ── Type tag
+        var tagTmp = MakeTMP(go.transform, "Tag",
+            new Vector2(0f, 0f), new Vector2(1f, 0.28f),
+            new Vector2(-4f, 0f), new Vector2(0f, 2f), FontTag);
+        tagTmp.alignment = TextAlignmentOptions.Center;
+
+        return new SlotEl
         {
-            Background = img,
-            MainLabel  = main,
-            TypeLabel  = tag,
-            Btn        = root.GetComponent<Button>()
+            Rt      = rt,
+            Outline = outlineImg,
+            Bg      = bgImg,
+            Main    = mainTmp,
+            Tag     = tagTmp,
+            Num     = numTmp
         };
     }
 
+    // ── Keyboard input ───────────────────────────────────────────
+
+    void Update()
+    {
+        if (DialoguePanel.IsOpen || EvolutionConfirmPanel.IsOpen) return;
+        for (int i = 0; i < SlotCount; i++)
+        {
+            KeyCode key = i < 9 ? (KeyCode)((int)KeyCode.Alpha1 + i) : KeyCode.Alpha0;
+            if (Input.GetKeyDown(key)) { SelectSlot(i); break; }
+        }
+    }
+
+    // ── Selection ────────────────────────────────────────────────
+
+    void SelectSlot(int index)
+    {
+        Inventory.Instance.SelectSlot(index);
+        Refresh();
+    }
+
+    // ── Refresh ──────────────────────────────────────────────────
+
     public void Refresh()
     {
-        if (slotElements == null) return;
-        for (int i = 0; i < Inventory.MaxSlots; i++)
+        if (!_built || _slots == null) return;
+        var selectedSlot = Inventory.Instance.SelectedSlot;
+        for (int i = 0; i < SlotCount; i++)
         {
-            var slot = Inventory.Instance.Slots[i];
-            var el   = slotElements[i];
-            el.Btn.onClick.RemoveAllListeners();
-
-            if (slot.IsEmpty)                                SetEmpty(el, i);
-            else if (slot.Type == InventoryItemType.Seed)    SetSeed(el, slot);
-            else if (slot.Type == InventoryItemType.Harvest) SetHarvest(el, slot);
-            else if (slot.Type == InventoryItemType.Tool)    SetTool(el, slot);
+            var inv = Inventory.Instance.Slots[i];
+            var el  = _slots[i];
+            bool sel = !inv.IsEmpty && inv == selectedSlot;
+            RefreshSlotEl(el, inv, sel);
         }
     }
 
-    void SetEmpty(SlotElements el, int index)
+    void RefreshSlotEl(SlotEl el, InventorySlot inv, bool selected)
     {
-        el.Background.color = UIColors.SlotEmpty;
-        el.MainLabel.text   = $"[{index + 1}]";
-        el.MainLabel.color  = UIColors.TextDim;
-        el.TypeLabel.text   = "";
-        el.Btn.onClick.AddListener(() =>
-        {
-            Inventory.Instance.Deselect();
-            Refresh();
-        });
-    }
+        // Outline peeks out behind the background when selected
+        el.Outline.gameObject.SetActive(selected);
 
-    void SetSeed(SlotElements el, InventorySlot slot)
-    {
-        bool selected       = Inventory.Instance.SelectedSeed == slot.Crop;
-        el.Background.color = selected ? UIColors.SlotSelected : UIColors.SlotSeed;
-        el.MainLabel.text   = $"{slot.Crop.cropName}\nx{slot.SeedCount}";
-        el.MainLabel.color  = UIColors.TextPrimary;
-        el.TypeLabel.text   = "SEED";
-        el.TypeLabel.color  = UIColors.TagSeed;
-        CropData captured   = slot.Crop;
-        el.Btn.onClick.AddListener(() =>
+        if (inv.IsEmpty)
         {
-            CancelPlacementIfActive();
-            Inventory.Instance.SelectSeed(captured);
-            Refresh();
-        });
-    }
+            el.Bg.color  = UIColors.SlotEmpty;
+            el.Main.text = ""; el.Tag.text = "";
+            el.Num.color = new Color(1f, 1f, 1f, 0.28f);
+            return;
+        }
 
-    void SetHarvest(SlotElements el, InventorySlot slot)
-    {
-        el.Background.color = UIColors.SlotHarvest;
-        el.MainLabel.text   = $"{slot.Crop.cropName}\nx{slot.Harvested.Count}";
-        el.MainLabel.color  = UIColors.TextPrimary;
-        el.TypeLabel.text   = "CROP";
-        el.TypeLabel.color  = UIColors.TagHarvest;
-    }
+        el.Num.color = new Color(0f, 0f, 0f, 0f); // hidden when item present
 
-    void SetTool(SlotElements el, InventorySlot slot)
-    {
-        bool selected       = Inventory.Instance.SelectedSlot == slot;
-        el.Background.color = selected ? UIColors.SlotSelected : slot.Tool.toolColor;
-        el.MainLabel.text   = slot.Tool.isConsumable
-                              ? $"{slot.Tool.toolName}\nx{slot.ToolCount}"
-                              : slot.Tool.toolName;
-        el.MainLabel.color  = UIColors.TextPrimary;
-        el.TypeLabel.text   = "TOOL";
-        el.TypeLabel.color  = UIColors.TextPrimary;
-        ToolData captured   = slot.Tool;
-        el.Btn.onClick.AddListener(() =>
+        switch (inv.Type)
         {
-            CancelPlacementIfActive();
-            Inventory.Instance.SelectTool(captured);
-            Refresh();
-        });
-    }
-
-    void HandleNumberKeys()
-    {
-        for (int i = 0; i < Inventory.MaxSlots && i < 9; i++)
-        {
-            if (!Input.GetKeyDown(KeyCode.Alpha1 + i)) continue;
-            CancelPlacementIfActive();
-            Inventory.Instance.SelectSlot(i);
-            Refresh();
+            case InventoryItemType.Seed:
+                el.Bg.color   = UIColors.SlotSeed;
+                el.Main.text  = $"{inv.Crop.cropName}\nx{inv.SeedCount}";
+                el.Main.color = UIColors.TextPrimary;
+                el.Tag.text   = "SEED"; el.Tag.color = UIColors.TagSeed;
+                break;
+            case InventoryItemType.Harvest:
+                el.Bg.color   = UIColors.SlotHarvest;
+                el.Main.text  = $"{inv.Crop.cropName}\nx{inv.Harvested.Count}";
+                el.Main.color = UIColors.TextPrimary;
+                el.Tag.text   = "CROP"; el.Tag.color = UIColors.TagHarvest;
+                break;
+            case InventoryItemType.Tool:
+                el.Bg.color   = inv.Tool.toolColor;
+                el.Main.text  = inv.Tool.isConsumable
+                    ? $"{inv.Tool.toolName}\nx{inv.ToolCount}" : inv.Tool.toolName;
+                el.Main.color = UIColors.TextPrimary;
+                el.Tag.text   = "TOOL"; el.Tag.color = UIColors.TextPrimary;
+                break;
         }
     }
+
+    // ── Static helper ────────────────────────────────────────────
 
     public static void CancelPlacementIfActive()
     {
@@ -288,20 +318,23 @@ public class InventoryHotbar : MonoBehaviour
             PlacementController.Instance.CancelPlacement();
     }
 
-    TextMeshProUGUI MakeLabel(Transform parent, string name,
-        Vector2 pos, Vector2 size, int fontSize)
+    // ── TMP factory ──────────────────────────────────────────────
+
+    TextMeshProUGUI MakeTMP(Transform parent, string name,
+        Vector2 anchorMin, Vector2 anchorMax,
+        Vector2 sizeDelta, Vector2 anchoredPos, int fontSize)
     {
         var go = new GameObject(name,
             typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         go.transform.SetParent(parent, false);
-        var rt = go.GetComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
-        rt.sizeDelta = size; rt.anchoredPosition = pos;
-        var tmp = go.GetComponent<TextMeshProUGUI>();
-        tmp.fontSize      = fontSize;
-        tmp.alignment     = TextAlignmentOptions.Center;
-        tmp.color         = UIColors.TextPrimary;
-        tmp.raycastTarget = false;
+        var rt              = go.GetComponent<RectTransform>();
+        rt.anchorMin        = anchorMin; rt.anchorMax = anchorMax;
+        rt.sizeDelta        = sizeDelta; rt.anchoredPosition = anchoredPos;
+        var tmp              = go.GetComponent<TextMeshProUGUI>();
+        tmp.fontSize         = fontSize;
+        tmp.color            = UIColors.TextDim;
+        tmp.raycastTarget    = false;
+        tmp.textWrappingMode = TextWrappingModes.Normal;
         return tmp;
     }
 }

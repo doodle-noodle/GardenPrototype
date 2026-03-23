@@ -1,0 +1,31 @@
+// Evolution cutscene Yarn nodes.
+// These are placeholder stubs. In a future session the actual cutscene visuals
+// (3D model → 2D sprite transform animation) will be triggered via Yarn commands
+// defined in a dedicated CutsceneDirector.cs.
+//
+// To add a new evolution cutscene:
+//   1. Duplicate the Evolve_Template node below.
+//   2. Set the title to match CharacterData.evolutionYarnNode on the asset.
+//   3. Replace the dialogue text with character-specific flavour text.
+//   4. Add <<startCutscene>> / <<endCutscene>> commands when CutsceneDirector is built.
+
+title: Evolve_Template
+---
+// <<startCutscene>>   ← slot in later
+{character_name} has evolved!
+// <<endCutscene>>     ← slot in later
+===
+
+title: Evolve_CuteCarrot
+---
+// <<startCutscene>>
+Cute Carrot has appeared!
+// <<endCutscene>>
+===
+
+title: Evolve_SpicyPepper
+---
+// <<startCutscene>>
+Spicy Pepper has appeared!
+// <<endCutscene>>
+===

@@ -7,21 +7,20 @@ using TMPro;
 using Yarn.Unity;
 
 // Custom Dialogue Presenter for Yarn Spinner 3.1.
-// Subclasses DialoguePresenterBase — add this component to any scene GameObject,
-// then drag it into the DialogueRunner's "Dialogue Presenters" list in the Inspector.
-// Disable or remove the default LinePresenter and OptionsPresenter — this replaces both.
+// Add this component to any scene GameObject and drag it into the DialogueRunner's
+// "Dialogue Presenters" list. Disable the default LinePresenter and OptionsPresenter.
 //
 // UI rules observed:
-//   — All Image backgrounds: raycastTarget = false
-//   — All TextMeshProUGUI:   raycastTarget = false
-//   — Button Image components keep raycastTarget = true (Unity default)
+//   - All Image backgrounds: raycastTarget = false
+//   - All TextMeshProUGUI:   raycastTarget = false
+//   - Button Image components keep raycastTarget = true (Unity default)
 public class DialoguePanel : DialoguePresenterBase
 {
     public static DialoguePanel? Instance { get; private set; }
     public static bool           IsOpen   { get; private set; }
 
     [Header("Yarn Spinner")]
-    [Tooltip("The scene's DialogueRunner. Auto-found at Start if blank.")]
+    [Tooltip("Auto-found at Start if blank.")]
     public DialogueRunner? dialogueRunner;
 
     // ── Layout constants ──────────────────────────────────────
@@ -73,18 +72,31 @@ public class DialoguePanel : DialoguePresenterBase
         _panel?.SetActive(false);
     }
 
-    // ── Public entry point ────────────────────────────────────
+    // ── Public entry points ───────────────────────────────────
 
+    // Called by FarmPlot when an Evolved plot is clicked.
     public void Open(CharacterData character)
+    {
+        OpenInternal(character, character.yarnStartNode);
+    }
+
+    // Called by EvolutionConfirmPanel when the player confirms evolution.
+    // Runs the cutscene Yarn node; fires EventBus.OnDialogueComplete when done.
+    public void OpenCutscene(CharacterData character, string yarnNode)
+    {
+        OpenInternal(character, yarnNode);
+    }
+
+    void OpenInternal(CharacterData character, string yarnNode)
     {
         if (dialogueRunner == null)
         {
             Debug.LogError("DialoguePanel: no DialogueRunner assigned or found in scene.");
             return;
         }
-        if (string.IsNullOrEmpty(character.yarnStartNode))
+        if (string.IsNullOrEmpty(yarnNode))
         {
-            Debug.LogError($"DialoguePanel: {character.characterName} has no yarnStartNode set.");
+            Debug.LogError($"DialoguePanel: {character?.characterName} — empty Yarn node string.");
             return;
         }
 
@@ -96,7 +108,7 @@ public class DialoguePanel : DialoguePresenterBase
         if (_portraitImage != null && character.portraitSprite != null)
             _portraitImage.sprite = character.portraitSprite;
 
-        dialogueRunner.StartDialogue(character.yarnStartNode);
+        dialogueRunner.StartDialogue(yarnNode);
     }
 
     // ── DialoguePresenterBase overrides ───────────────────────
@@ -118,13 +130,18 @@ public class DialoguePanel : DialoguePresenterBase
         _advanceRequested = false;
         _selectedOption   = null;
         _typewriterDone   = false;
+
         if (RelationshipManager.Instance != null)
             RelationshipManager.Instance.CurrentCharacter = null;
+
         AudioManager.Play(SoundEvent.DialogueClose);
+
+        // Notify EvolutionConfirmPanel (or any other subscriber) that dialogue ended.
+        EventBus.Raise_DialogueComplete();
+
         return YarnTask.CompletedTask;
     }
 
-    // Displays a line with typewriter effect, waits for Continue or cancellation.
     public override async YarnTask RunLineAsync(LocalizedLine line, LineCancellationToken token)
     {
         string speaker = !string.IsNullOrEmpty(line.CharacterName)
@@ -139,8 +156,6 @@ public class DialoguePanel : DialoguePresenterBase
         _advanceRequested = false;
         StartCoroutine(TypewriterCoroutine(line.TextWithoutCharacterName.Text, token));
 
-        // IsNextContentRequested replaces obsolete IsNextLineRequested (YS 3.1)
-        // IsImmediateCancellationRequested was removed — IsNextContentRequested covers both cases
         while (!_typewriterDone && !token.IsNextContentRequested)
             await YarnTask.Yield();
 
@@ -157,8 +172,6 @@ public class DialoguePanel : DialoguePresenterBase
         SetContinueVisible(false);
     }
 
-    // Displays branching options; returns the selected DialogueOption? (YS 3.1 signature).
-    // CS0672 suppressed — we must override this obsolete base method to intercept options.
 #pragma warning disable CS0672
     public override async YarnTask<DialogueOption?> RunOptionsAsync(DialogueOption[] options,
         CancellationToken cancellationToken)
@@ -180,14 +193,13 @@ public class DialoguePanel : DialoguePresenterBase
 
     // ── Typewriter coroutine ──────────────────────────────────
 
-    IEnumerator TypewriterCoroutine(string fullText, LineCancellationToken token)
+    System.Collections.IEnumerator TypewriterCoroutine(string fullText, LineCancellationToken token)
     {
         const float charDelay = 0.03f;
         if (_dialogueTextTmp != null) _dialogueTextTmp.text = "";
 
         for (int i = 0; i <= fullText.Length; i++)
         {
-            // IsNextContentRequested covers both skip-to-end and immediate cancel (YS 3.1)
             if (token.IsNextContentRequested) break;
             if (_dialogueTextTmp != null)
                 _dialogueTextTmp.text = fullText.Substring(0, i);
@@ -210,18 +222,16 @@ public class DialoguePanel : DialoguePresenterBase
         if (target != null) _portraitImage.sprite = target;
     }
 
-    void SetContinueVisible(bool visible) { _continueBtn?.SetActive(visible); }
-    void SetOptionsVisible(bool visible)  { _optionsContainer?.SetActive(visible); }
+    void SetContinueVisible(bool v) { _continueBtn?.SetActive(v); }
+    void SetOptionsVisible(bool v)  { _optionsContainer?.SetActive(v); }
 
     void BuildOptionButtons(DialogueOption[] options)
     {
         if (_optionsContainer == null) return;
+        foreach (var btn in _optionButtons) if (btn != null) Destroy(btn);
 
-        foreach (var btn in _optionButtons)
-            if (btn != null) Destroy(btn);
-
-        int   count = Mathf.Min(options.Length, MaxOptions);
-        float yPos  = 0f;
+        int count = Mathf.Min(options.Length, MaxOptions);
+        float yPos = 0f;
 
         for (int i = 0; i < count; i++)
         {
@@ -251,13 +261,8 @@ public class DialoguePanel : DialoguePresenterBase
     void BuildUI()
     {
         Canvas? canvas = FindFirstObjectByType<Canvas>();
-        if (canvas == null)
-        {
-            Debug.LogError("DialoguePanel: no Canvas found in scene.");
-            return;
-        }
+        if (canvas == null) { Debug.LogError("DialoguePanel: no Canvas found."); return; }
 
-        // Root panel
         _panel = new GameObject("DialoguePanel",
             typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         _panel.transform.SetParent(canvas.transform, false);
@@ -277,7 +282,6 @@ public class DialoguePanel : DialoguePresenterBase
         var portraitFrame = new GameObject("PortraitFrame",
             typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         portraitFrame.transform.SetParent(_panel.transform, false);
-
         var pfRt              = portraitFrame.GetComponent<RectTransform>();
         pfRt.anchorMin        = new Vector2(0f, 0.5f);
         pfRt.anchorMax        = new Vector2(0f, 0.5f);
@@ -290,12 +294,10 @@ public class DialoguePanel : DialoguePresenterBase
         var portraitGo = new GameObject("Portrait",
             typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         portraitGo.transform.SetParent(portraitFrame.transform, false);
-
-        var piRt = portraitGo.GetComponent<RectTransform>();
+        var piRt       = portraitGo.GetComponent<RectTransform>();
         piRt.anchorMin = new Vector2(0.05f, 0.05f);
         piRt.anchorMax = new Vector2(0.95f, 0.95f);
-        piRt.offsetMin = Vector2.zero;
-        piRt.offsetMax = Vector2.zero;
+        piRt.offsetMin = piRt.offsetMax = Vector2.zero;
         _portraitImage                = portraitGo.GetComponent<Image>();
         _portraitImage.preserveAspect = true;
         _portraitImage.raycastTarget  = false;
@@ -335,7 +337,7 @@ public class DialoguePanel : DialoguePresenterBase
         _dialogueTextTmp.fontSize         = FontText;
         _dialogueTextTmp.color            = UIColors.TextPrimary;
         _dialogueTextTmp.alignment        = TextAlignmentOptions.TopLeft;
-        _dialogueTextTmp.textWrappingMode = TextWrappingModes.Normal; // replaces obsolete enableWordWrapping
+        _dialogueTextTmp.textWrappingMode = TextWrappingModes.Normal;
         _dialogueTextTmp.overflowMode     = TextOverflowModes.Truncate;
         _dialogueTextTmp.raycastTarget    = false;
 
@@ -368,36 +370,31 @@ public class DialoguePanel : DialoguePresenterBase
         var go = new GameObject("Btn",
             typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
         go.transform.SetParent(parent, false);
-
         var rt              = go.GetComponent<RectTransform>();
         rt.anchorMin        = new Vector2(0.5f, 0.5f);
         rt.anchorMax        = new Vector2(0.5f, 0.5f);
         rt.pivot            = new Vector2(0.5f, 0.5f);
         rt.sizeDelta        = size;
         rt.anchoredPosition = anchoredPos;
-
         go.GetComponent<Image>().color = color;
         go.GetComponent<Button>().onClick.AddListener(onClick);
 
         var lbl = new GameObject("Label",
             typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         lbl.transform.SetParent(go.transform, false);
-
         var lrt              = lbl.GetComponent<RectTransform>();
         lrt.anchorMin        = Vector2.zero;
         lrt.anchorMax        = Vector2.one;
         lrt.sizeDelta        = new Vector2(-8f, 0f);
         lrt.anchoredPosition = Vector2.zero;
-
-        var tmp               = lbl.GetComponent<TextMeshProUGUI>();
-        tmp.text              = label;
-        tmp.fontSize          = label.Length < 20 ? FontContinue : FontOption;
-        tmp.alignment         = TextAlignmentOptions.Center;
-        tmp.color             = UIColors.TextPrimary;
-        tmp.richText          = true;
-        tmp.textWrappingMode  = TextWrappingModes.Normal; // replaces obsolete enableWordWrapping
-        tmp.raycastTarget     = false;
-
+        var tmp              = lbl.GetComponent<TextMeshProUGUI>();
+        tmp.text             = label;
+        tmp.fontSize         = label.Length < 20 ? FontContinue : FontOption;
+        tmp.alignment        = TextAlignmentOptions.Center;
+        tmp.color            = UIColors.TextPrimary;
+        tmp.richText         = true;
+        tmp.textWrappingMode = TextWrappingModes.Normal;
+        tmp.raycastTarget    = false;
         return go;
     }
 }

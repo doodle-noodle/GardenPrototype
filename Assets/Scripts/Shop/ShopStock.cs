@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+ï»¿using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
@@ -10,39 +10,39 @@ public class ShopStock : MonoBehaviour
     public int   itemsPerRefresh = 6;
     public float refreshInterval = 300f;
 
-    [Header("All shop items — drag any CropData or PlaceableData here")]
+    [Header("All shop items â€” drag any CropData, PlaceableData, or ToolData here")]
     public List<ScriptableObject> allShopItems;
 
     public List<ShopItem> CurrentStock { get; private set; } = new List<ShopItem>();
 
-    private float refreshTimer = 0f;
+    private float _refreshTimer = 0f;
 
     void Awake() => Instance = this;
     void Start()  => Refresh();
 
     void Update()
     {
-        refreshTimer += Time.deltaTime;
-        if (refreshTimer >= refreshInterval)
+        _refreshTimer += Time.deltaTime;
+        if (_refreshTimer >= refreshInterval)
         {
-            refreshTimer = 0f;
+            _refreshTimer = 0f;
             Refresh();
         }
     }
 
-    public float TimeUntilRefresh => refreshInterval - refreshTimer;
+    public float TimeUntilRefresh => refreshInterval - _refreshTimer;
 
-    void Refresh()
+    public void Refresh()
     {
         CurrentStock.Clear();
 
-        // Any ScriptableObject implementing IShopable is valid stock
         var pool = allShopItems
             .OfType<IShopable>()
+            .Where(item => item is ToolData || Random.value <= item.StockChance)
             .Select(item => item.CreateShopItem())
             .ToList();
 
-        // Shuffle
+        // Fisher-Yates shuffle
         for (int i = pool.Count - 1; i > 0; i--)
         {
             int j = Random.Range(0, i + 1);
@@ -54,6 +54,5 @@ public class ShopStock : MonoBehaviour
             CurrentStock.Add(pool[i]);
 
         EventBus.Raise_ShopStockRefreshed();
-        Debug.Log($"Shop refreshed — {CurrentStock.Count} items available.");
     }
 }

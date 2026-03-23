@@ -19,6 +19,9 @@ MonoBehaviour:
   BurialPlantDuration: 0.15
   DropHeight: 4
   DropDuration: 0.3
-  GlowColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
-  GlowIntensity: 0.2
+  GlowColor: {r: 1, g: 1, b: 1, a: 0}
+  GlowIntensity: 0
   GlowPulseSpeed: 2
+  EvolutionGlowColor: {r: 0.75, g: 0.35, b: 1, a: 1}
+  EvolutionGlowIntensity: 1.6
+  EvolutionGlowPulseSpeed: 1.2

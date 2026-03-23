@@ -59,21 +59,19 @@ public class Inventory : MonoBehaviour
         {
             if (SelectedSlot == slot) Deselect();
             slot.Clear();
-            SelectedSeed = Slots.FirstOrDefault(s =>
-                s.Type == InventoryItemType.Seed)?.Crop;
+            SelectedSeed = Slots.FirstOrDefault(
+                s => s.Type == InventoryItemType.Seed)?.Crop;
         }
         EventBus.Raise_SeedUsed(crop);
         return true;
     }
 
+    // Always equips — clicking an already-selected seed keeps it selected (no toggle-off).
     public void SelectSeed(CropData crop)
     {
         var slot = FindSeedSlot(crop);
         if (slot == null || slot.SeedCount <= 0)
         { TutorialConsole.Warn($"No {crop.cropName} seeds."); return; }
-
-        // Toggle deselect if already selected
-        if (SelectedSeed == crop) { Deselect(); return; }
         SelectSeedInternal(crop);
     }
 
@@ -112,6 +110,7 @@ public class Inventory : MonoBehaviour
 
     public bool UseTool(ToolData tool)
     {
+        if (tool == null) return false;
         var slot = FindToolSlot(tool);
         if (slot == null || slot.ToolCount <= 0) return false;
         slot.ToolCount--;
@@ -124,20 +123,17 @@ public class Inventory : MonoBehaviour
         return true;
     }
 
+    // Always equips — no toggle-off on re-click.
     public void SelectTool(ToolData tool)
     {
         var slot = FindToolSlot(tool);
         if (slot == null || slot.ToolCount <= 0)
         { TutorialConsole.Warn($"No {tool.toolName}."); return; }
-
-        // Toggle deselect if already selected
-        if (SelectedSlot == slot) { Deselect(); return; }
-
         SelectedSeed = null;
         SelectedSlot = slot;
     }
 
-    // Clears selection — player has empty hands
+    // Deselects to empty hands. Called when an empty hotbar slot is clicked/pressed.
     public void Deselect()
     {
         SelectedSeed = null;
@@ -198,8 +194,9 @@ public class Inventory : MonoBehaviour
         return $"{h.Source?.cropName ?? ""}|{muts}";
     }
 
-    // ── Slot selection ────────────────────────────────────────
-
+    // ── Slot selection ─────────────────────────────────────────
+    // Called by number keys and hotbar button clicks.
+    // Occupied slot → equip. Empty slot → deselect.
     public void SelectSlot(int index)
     {
         if (index < 0 || index >= MaxSlots) return;
@@ -217,7 +214,8 @@ public class Inventory : MonoBehaviour
         if (SelectedSlot == null) return;
         bool valid = Slots.Contains(SelectedSlot) || StorageSlots.Contains(SelectedSlot);
         if (!valid || SelectedSlot.IsEmpty) Deselect();
-        else if (SelectedSlot.Type == InventoryItemType.Seed) SelectedSeed = SelectedSlot.Crop;
+        else if (SelectedSlot.Type == InventoryItemType.Seed)
+            SelectedSeed = SelectedSlot.Crop;
 
         if (SelectedSeed != null)
         {

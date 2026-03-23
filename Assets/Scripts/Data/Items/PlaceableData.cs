@@ -18,10 +18,14 @@ public class PlaceableData : ScriptableObject, IShopable
 
     [Header("Shop")]
     public Rarity rarity = Rarity.Common;
+    [Range(0f, 1f)]
+    [Tooltip("Chance this placeable appears in the shop pool on each refresh.")]
+    public float stockChance = 1f;
 
     // ── IShopable ─────────────────────────────────────────────
     string   IShopable.DisplayName    => placeableName;
     int      IShopable.BasePrice      => unlockCost;
     Rarity   IShopable.ItemRarity     => rarity;
+    float    IShopable.StockChance    => stockChance;
     ShopItem IShopable.CreateShopItem() => ShopItem.MakePlaceable(this, rarity);
 }

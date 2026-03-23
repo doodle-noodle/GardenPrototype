@@ -16,6 +16,9 @@ public class CropData : ScriptableObject, IShopable
 
     [Header("Shop")]
     public Rarity rarity = Rarity.Common;
+    [Range(0f, 1f)]
+    [Tooltip("Chance this crop seed appears in the shop pool on each refresh.")]
+    public float stockChance = 1f;
 
     [Header("Growth — logic")]
     public GrowthStage[] growthStages;
@@ -26,24 +29,26 @@ public class CropData : ScriptableObject, IShopable
     [Header("Multi-Harvest")]
     [Tooltip("If true, harvesting does not remove the plant — it regrows after regrowDuration.")]
     public bool       isMultiHarvest = false;
-    [Tooltip("Seconds until the plant becomes Ready again after a multi-harvest.")]
     public float      regrowDuration = 60f;
-    [Tooltip("Model shown while regrowing (fruits/produce removed). If null, no model is shown.")]
+    [Tooltip("Model shown while regrowing (produce removed). Null = no model shown.")]
     public GameObject strippedPrefab;
 
-    [Header("Mutation / Evolution")]
+    [Header("Harvest Mutations")]
     [Range(0f, 1f)]
-    public float    mutationChance = 0.05f;
-    public CropData mutatesInto;
+    [Tooltip("Chance to apply one mutation from possibleHarvestMutations on harvest.")]
+    public float             mutationChance            = 0.05f;
+    [Tooltip("If mutationChance roll succeeds, one of these is chosen at random.")]
+    public List<MutationData> possibleHarvestMutations = new List<MutationData>();
 
     [Header("Character Evolution")]
-    [Tooltip("If assigned and this crop rolls IsEvolved on harvest, it becomes this character " +
-             "instead of going to inventory. If null the crop is harvested normally even if IsEvolved.")]
-    public CharacterData characterData;
+    [Tooltip("Ordered list of possible evolution outcomes. First path with all conditions " +
+             "met and no duplicate character on the farm wins.")]
+    public List<EvolutionPath> evolutionPaths = new List<EvolutionPath>();
 
     // ── IShopable ─────────────────────────────────────────────
     string   IShopable.DisplayName    => cropName;
     int      IShopable.BasePrice      => seedCost;
     Rarity   IShopable.ItemRarity     => rarity;
+    float    IShopable.StockChance    => stockChance;
     ShopItem IShopable.CreateShopItem() => ShopItem.MakeSeed(this, rarity);
 }

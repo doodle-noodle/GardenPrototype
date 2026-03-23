@@ -5,112 +5,106 @@ public class FarmPlot : MonoBehaviour
 {
     public enum PlotState { Empty, Growing, Ready, Regrowing, Evolved }
 
-    public PlotState          State            { get; private set; } = PlotState.Empty;
-    public CropData           ActiveCrop       { get; private set; }
-    public int                CurrentStage     { get; private set; } = -1;
-    public float              StageTimer       { get; private set; } = 0f;
-    public float              RegrowTimer      { get; private set; } = 0f;
-    public bool               IsEvolved        { get; private set; } = false;
-    public bool               IsWatered        { get; private set; } = false;
-    public bool               StateChanged     { get; private set; }
-    public List<MutationData> Mutations        { get; private set; } = new List<MutationData>();
-    public CharacterData      EvolvedCharacter { get; private set; }
+    public PlotState          State             { get; private set; } = PlotState.Empty;
+    public CropData           ActiveCrop        { get; private set; }
+    public int                CurrentStage      { get; private set; } = -1;
+    public float              StageTimer        { get; private set; } = 0f;
+    public float              RegrowTimer       { get; private set; } = 0f;
+    public int                WaterCount        { get; private set; } = 0;
+    public bool               IsWatered         => WaterCount > 0;
+    public bool               IsFertilized      => _fertilizerData != null;
+    public bool               IsEvolved         { get; private set; } = false;
+    public bool               StateChanged      { get; private set; }
+    public List<MutationData> Mutations         { get; private set; } = new List<MutationData>();
+    public CharacterData      EvolvedCharacter  { get; private set; }
+    public EvolutionPath      ReadyToEvolveWith { get; private set; }
 
     public int GridX { get; set; }
     public int GridZ { get; set; }
 
-    // Soil — lazy: falls back to world default if not explicitly assigned
     private SoilData _currentSoil;
     public SoilData CurrentSoil
     {
         get  => _currentSoil ?? WorldEventManager.Instance?.currentWorld?.defaultSoil;
-        set
-        {
-            _currentSoil = value;
-            _visual?.ApplySoilColor(value?.soilColor ?? _visual.OriginalPlotColor);
-        }
+        set  { _currentSoil = value; _visual?.ApplySoilColor(value?.soilColor); }
     }
 
     private FarmPlotVisual _visual;
     private bool           _hasTriedPlantingThisHover = false;
-    private float          _wateringSpeedMultiplier   = 1f;
     private FertilizerData _fertilizerData;
     private float          _fertilizerGrowthBonus     = 0f;
 
-    private static float _placementCooldownUntil = 0f;
+    private readonly HashSet<EvolutionPath> _declinedEvolutions = new HashSet<EvolutionPath>();
 
+    private static float _placementCooldownUntil = 0f;
     public static void SetPlacementCooldown(float duration = 0.15f)
         => _placementCooldownUntil = Time.time + duration;
-
-    private static bool PlacementCooldownActive =>
-        Time.time < _placementCooldownUntil;
+    private static bool PlacementCooldownActive => Time.time < _placementCooldownUntil;
 
     // ── Lifecycle ─────────────────────────────────────────────
 
-    void Awake()
-    {
-        _visual = GetComponent<FarmPlotVisual>();
-    }
+    void Awake() { _visual = GetComponent<FarmPlotVisual>(); }
 
     void Update()
     {
         StateChanged = false;
 
-        if (State == PlotState.Regrowing)
-        {
-            TickRegrowing();
-            return;
-        }
-
-        if (State != PlotState.Growing) return;
+        if (State == PlotState.Regrowing) { TickRegrowing(); return; }
+        if (State != PlotState.Growing)   return;
 
         if (ActiveCrop == null || ActiveCrop.growthStages == null ||
             CurrentStage >= ActiveCrop.growthStages.Length)
         {
-            Debug.LogWarning($"FarmPlot: invalid state on {gameObject.name}. Resetting.");
-            ResetState();
-            return;
+            Debug.LogWarning($"FarmPlot: invalid state on {name}. Resetting.");
+            ResetState(); return;
         }
 
         StageTimer += Time.deltaTime * CurrentGrowthSpeed;
-
-        GrowthStage stage        = ActiveCrop.growthStages[CurrentStage];
-        bool        isFinalStage = CurrentStage == ActiveCrop.growthStages.Length - 1;
+        var  stage        = ActiveCrop.growthStages[CurrentStage];
+        bool isFinalStage = CurrentStage == ActiveCrop.growthStages.Length - 1;
 
         if (!isFinalStage && StageTimer >= stage.duration)
         {
-            CurrentStage++;
-            StageTimer   = 0f;
-            StateChanged = true;
+            CurrentStage++; StageTimer = 0f; StateChanged = true;
         }
         else if (isFinalStage && StageTimer >= stage.duration)
         {
-            State        = PlotState.Ready;
-            StateChanged = true;
-            AudioManager.Play(SoundEvent.PlantReady);
-            EventBus.Raise_PlotReady(this);
-            TutorialConsole.Log($"{ActiveCrop.cropName} is ready to harvest!");
+            State = PlotState.Ready; StateChanged = true;
+            OnEnterReady();
         }
     }
 
     void TickRegrowing()
     {
         RegrowTimer -= Time.deltaTime;
-        if (RegrowTimer <= 0f)
+        if (RegrowTimer > 0f) return;
+        State = PlotState.Ready; StateChanged = true;
+        OnEnterReady();
+    }
+
+    void OnEnterReady()
+    {
+        ReadyToEvolveWith = FindValidEvolutionPath();
+        if (ReadyToEvolveWith != null)
         {
-            State        = PlotState.Ready;
+            TutorialConsole.Log(
+                $"<color=#66FF66>{ActiveCrop.cropName} wants to evolve!</color>");
             StateChanged = true;
+        }
+        else
+        {
             AudioManager.Play(SoundEvent.PlantReady);
             EventBus.Raise_PlotReady(this);
-            TutorialConsole.Log($"{ActiveCrop.cropName} has regrown — ready to harvest again!");
+            TutorialConsole.Log($"{ActiveCrop.cropName} is ready to harvest!");
         }
     }
 
     // ── Growth speed ──────────────────────────────────────────
 
-    // All multipliers consolidated here — referenced by Update, HandleClick (remaining time calc)
+    float WateringMult => Mathf.Min(1f + WaterCount, 4f);
+
     public float CurrentGrowthSpeed =>
-        _wateringSpeedMultiplier
+        WateringMult
         * CalculateSoilMult()
         * (1f + _fertilizerGrowthBonus)
         * (WorldEventManager.Instance?.GrowthSpeedMultiplier ?? 1f);
@@ -126,6 +120,97 @@ public class FarmPlot : MonoBehaviour
                  !TagUtility.HasAnyTag(ActiveCrop.tags, soil.compatibleCropTags))
             m *= 0.5f;
         return m;
+    }
+
+    // ── Evolution conditions ──────────────────────────────────
+
+    EvolutionPath FindValidEvolutionPath()
+    {
+        if (ActiveCrop?.evolutionPaths == null || ActiveCrop.evolutionPaths.Count == 0)
+            return null;
+
+        foreach (var path in ActiveCrop.evolutionPaths)
+        {
+            if (path?.characterData == null)              continue;
+            if (_declinedEvolutions.Contains(path))       continue;
+            if (RelationshipManager.Instance != null &&
+                RelationshipManager.Instance.ExistingCharacters.Contains(path.characterData))
+                continue;
+
+            bool allMet = true;
+            if (path.conditions != null)
+                foreach (var cond in path.conditions)
+                    if (!CheckCondition(cond)) { allMet = false; break; }
+
+            if (allMet) return path;
+        }
+        return null;
+    }
+
+    bool CheckCondition(EvolutionCondition cond)
+    {
+        switch (cond.type)
+        {
+            case EvolutionConditionType.HasMutation:
+                return cond.requiredMutation != null && Mutations.Contains(cond.requiredMutation);
+
+            case EvolutionConditionType.IsFertilized:
+                return IsFertilized;
+
+            case EvolutionConditionType.WateredAtLeast:
+                return WaterCount >= cond.minWaterCount;
+
+            case EvolutionConditionType.WorldEvent:
+            {
+                var mgr = WorldEventManager.Instance;
+                if (mgr == null) return false;
+                foreach (var e in cond.requiredWorldEvents)
+                    if (!mgr.IsEventActive(e)) return false;
+                foreach (var e in cond.forbiddenWorldEvents)
+                    if (mgr.IsEventActive(e)) return false;
+                return true;
+            }
+
+            case EvolutionConditionType.SoilType:
+                return CurrentSoil == cond.requiredSoil;
+
+            default:
+                return true;
+        }
+    }
+
+    public void DeclineEvolution()
+    {
+        if (ReadyToEvolveWith != null)
+            _declinedEvolutions.Add(ReadyToEvolveWith);
+
+        TutorialConsole.Log($"{ActiveCrop.cropName} decided not to evolve.");
+        ReadyToEvolveWith = null;
+        StateChanged = true;
+
+        ReadyToEvolveWith = FindValidEvolutionPath();
+        if (ReadyToEvolveWith != null)
+        {
+            TutorialConsole.Log(
+                $"<color=#66FF66>{ActiveCrop.cropName} wants to evolve!</color>");
+        }
+        else
+        {
+            AudioManager.Play(SoundEvent.PlantReady);
+            EventBus.Raise_PlotReady(this);
+            TutorialConsole.Log($"{ActiveCrop.cropName} is ready to harvest!");
+        }
+    }
+
+    public void EvolvePlot(CharacterData data)
+    {
+        ReadyToEvolveWith = null;
+        IsEvolved         = true;
+        EvolvedCharacter  = data;
+        State             = PlotState.Evolved;
+        StateChanged      = true;
+        TutorialConsole.Log($"{data.characterName} has appeared on your farm!");
+        EventBus.Raise_PlotEvolved(this, data);
     }
 
     // ── Mutations ─────────────────────────────────────────────
@@ -160,60 +245,43 @@ public class FarmPlot : MonoBehaviour
 
     public void ApplyFertilizer(FertilizerData data)
     {
-        if (data == null || State != PlotState.Growing) return;
-        if (data.affectedTags.Count > 0 &&
-            !TagUtility.HasAnyTag(ActiveCrop.tags, data.affectedTags))
-        {
-            TutorialConsole.Warn($"{data.fertilizerName} doesn't affect {ActiveCrop.cropName}.");
-            return;
-        }
+        if (data == null)             return;
+        if (State != PlotState.Empty) return;
+        if (IsFertilized)             return;
+
         _fertilizerData        = data;
         _fertilizerGrowthBonus = data.growthBonus;
-        _visual?.ShowFertilizerEffect(data.tintColor);
-        TutorialConsole.Log($"Applied {data.fertilizerName} to {ActiveCrop.cropName}!");
+        _visual?.ShowFertilizerOverlay(data);
+        TutorialConsole.Log($"Applied {data.fertilizerName} to the plot!");
     }
 
     // ── Watering ──────────────────────────────────────────────
 
     public void ApplyWatering()
     {
-        if (IsWatered || State != PlotState.Growing) return;
-        IsWatered                = true;
-        _wateringSpeedMultiplier = 2f;
-        _visual?.ShowWateringEffect();
+        if (State != PlotState.Growing) return;
+        WaterCount++;
+        _visual?.ShowWateringOverlay();
+        TutorialConsole.Log($"Watered {ActiveCrop.cropName}! (x{WaterCount})");
     }
 
     // ── Input ─────────────────────────────────────────────────
 
-    void OnMouseEnter()
-    {
-        _hasTriedPlantingThisHover = false;
-        _visual?.OnHoverEnter();
-    }
-
-    void OnMouseExit()
-    {
-        _hasTriedPlantingThisHover = false;
-        _visual?.OnHoverExit();
-    }
+    void OnMouseEnter() { _hasTriedPlantingThisHover = false; _visual?.OnHoverEnter(); }
+    void OnMouseExit()  { _hasTriedPlantingThisHover = false; _visual?.OnHoverExit(); }
 
     void OnMouseOver()
     {
         if (PlacementController.Instance != null &&
             PlacementController.Instance.IsPlacing) return;
-        if (PlacementCooldownActive) return;
-
+        if (PlacementCooldownActive)        return;
         _visual?.OnHoverStay();
+        if (ShopUI.IsOpen)                return;
+        if (DialoguePanel.IsOpen)         return;
+        if (EvolutionConfirmPanel.IsOpen)  return;
+        if (AnyToolEquipped())             return;
 
-        if (ShopUI.IsOpen)        return;
-        if (DialoguePanel.IsOpen) return;
-        if (ShovelEquipped())     return;
-
-        if (Input.GetMouseButtonUp(0))
-        {
-            _hasTriedPlantingThisHover = false;
-            return;
-        }
+        if (Input.GetMouseButtonUp(0)) { _hasTriedPlantingThisHover = false; return; }
 
         if (Input.GetMouseButton(0) && State == PlotState.Empty &&
             !_hasTriedPlantingThisHover)
@@ -227,18 +295,17 @@ public class FarmPlot : MonoBehaviour
     {
         if (PlacementController.Instance != null &&
             PlacementController.Instance.IsPlacing) return;
-        if (PlacementCooldownActive) return;
-        if (ShopUI.IsOpen)        return;
-        if (DialoguePanel.IsOpen) return;
-        if (ShovelEquipped())     return;
-
+        if (PlacementCooldownActive)        return;
+        if (ShopUI.IsOpen)                return;
+        if (DialoguePanel.IsOpen)         return;
+        if (EvolutionConfirmPanel.IsOpen)  return;
+        if (AnyToolEquipped())             return;
         HandleClick();
     }
 
-    bool ShovelEquipped()
+    bool AnyToolEquipped()
     {
-        var tool = Inventory.Instance.SelectedSlot?.Tool;
-        return tool != null && tool.toolType == ToolType.Shovel;
+        return Inventory.Instance.SelectedSlot?.Tool != null;
     }
 
     void HandleClick()
@@ -250,20 +317,24 @@ public class FarmPlot : MonoBehaviour
                 break;
 
             case PlotState.Ready:
-                Harvest();
-                _hasTriedPlantingThisHover = true;
+                if (ReadyToEvolveWith != null)
+                    EvolutionConfirmPanel.Instance?.Open(this, ReadyToEvolveWith);
+                else
+                {
+                    Harvest();
+                    _hasTriedPlantingThisHover = true;
+                }
                 break;
 
             case PlotState.Growing:
             {
-                float speed     = CurrentGrowthSpeed;
-                float remaining = (ActiveCrop.growthStages[CurrentStage].duration
-                                   - StageTimer) / speed;
+                float speed = CurrentGrowthSpeed;
+                float rem   = (ActiveCrop.growthStages[CurrentStage].duration - StageTimer) / speed;
                 for (int i = CurrentStage + 1; i < ActiveCrop.growthStages.Length - 1; i++)
-                    remaining += ActiveCrop.growthStages[i].duration / speed;
+                    rem += ActiveCrop.growthStages[i].duration / speed;
                 TutorialConsole.Log($"{ActiveCrop.cropName} — stage " +
                     $"{CurrentStage + 1}/{ActiveCrop.growthStages.Length}, " +
-                    $"ready in {remaining:F1}s.");
+                    $"ready in {rem:F1}s.");
                 break;
             }
 
@@ -273,7 +344,6 @@ public class FarmPlot : MonoBehaviour
                 break;
 
             case PlotState.Evolved:
-                // Open the Yarn Spinner dialogue — watering can still works as an affection gesture
                 if (EvolvedCharacter != null)
                     DialoguePanel.Instance?.Open(EvolvedCharacter);
                 break;
@@ -297,16 +367,18 @@ public class FarmPlot : MonoBehaviour
             return;
         }
 
-        ActiveCrop             = selected;
-        CurrentStage           = 0;
-        StageTimer             = 0f;
-        IsEvolved              = false;
-        _fertilizerData        = null;
-        _fertilizerGrowthBonus = 0f;
+        ActiveCrop   = selected;
+        CurrentStage = 0;
+        StageTimer   = 0f;
+        IsEvolved    = false;
+        WaterCount   = 0;
+        _declinedEvolutions.Clear();
         Mutations.Clear();
-        State        = PlotState.Growing;
-        StateChanged = true;
 
+        if (_fertilizerData != null)
+            _fertilizerGrowthBonus = _fertilizerData.growthBonus;
+
+        State = PlotState.Growing; StateChanged = true;
         AudioManager.Play(SoundEvent.SeedPlanted);
         TutorialConsole.Log($"Planted {ActiveCrop.cropName}!");
         EventBus.Raise_PlotPlanted(this);
@@ -321,36 +393,30 @@ public class FarmPlot : MonoBehaviour
                        + (_fertilizerData?.mutationChanceBonus ?? 0f);
         var result = HarvestResolver.Resolve(ActiveCrop, mutBonus);
 
-        // Evolution path — crop stays on the plot as a character
-        if (result.IsEvolved && ActiveCrop.characterData != null)
-        {
-            EvolvePlot(ActiveCrop.characterData);
-            return;
-        }
-
         foreach (var m in Mutations) result.Mutations.Add(m);
 
-        // Guaranteed fertilizer mutation
         if (_fertilizerData?.guaranteedMutation != null &&
             !result.Mutations.Contains(_fertilizerData.guaranteedMutation))
-            result.Mutations.Add(_fertilizerData.guaranteedMutation);
+        {
+            bool tagMatch = _fertilizerData.affectedTags.Count == 0 ||
+                            TagUtility.HasAnyTag(ActiveCrop.tags, _fertilizerData.affectedTags);
+            if (tagMatch) result.Mutations.Add(_fertilizerData.guaranteedMutation);
+        }
 
         Inventory.Instance.AddHarvest(result);
         AudioManager.Play(SoundEvent.SeedHarvested);
-        FloatingText.Spawn(
-            $"+{result.SellValue}",
-            transform.position + Vector3.up * 1.5f,
-            UIColors.FloatingGold, 28);
+        FloatingText.Spawn($"+{result.SellValue}",
+            transform.position + Vector3.up * 1.5f, UIColors.FloatingGold, 28);
         TutorialConsole.Log($"Harvested {result.DisplayName} — worth {result.SellValue} coins.");
         _hasTriedPlantingThisHover = true;
 
         if (ActiveCrop.isMultiHarvest)
         {
-            _fertilizerData          = null;
-            _fertilizerGrowthBonus   = 0f;
-            IsWatered                = false;
-            _wateringSpeedMultiplier = 1f;
+            _fertilizerData        = null;
+            _fertilizerGrowthBonus = 0f;
+            WaterCount             = 0;
             Mutations.Clear();
+            _visual?.HideAllOverlays();
             RegrowTimer  = ActiveCrop.regrowDuration;
             State        = PlotState.Regrowing;
             StateChanged = true;
@@ -360,18 +426,6 @@ public class FarmPlot : MonoBehaviour
         {
             ResetState();
         }
-    }
-
-    // ── Evolution ─────────────────────────────────────────────
-
-    void EvolvePlot(CharacterData data)
-    {
-        IsEvolved        = true;
-        EvolvedCharacter = data;
-        State            = PlotState.Evolved;
-        StateChanged     = true;
-        TutorialConsole.Log($"{data.characterName} has appeared on your farm!");
-        EventBus.Raise_PlotEvolved(this, data);
     }
 
     // ── Removal ───────────────────────────────────────────────
@@ -388,19 +442,64 @@ public class FarmPlot : MonoBehaviour
 
     void ResetState()
     {
-        ActiveCrop               = null;
-        CurrentStage             = -1;
-        StageTimer               = 0f;
-        RegrowTimer              = 0f;
-        IsEvolved                = false;
-        EvolvedCharacter         = null;
-        IsWatered                = false;
-        _wateringSpeedMultiplier = 1f;
-        _fertilizerData          = null;
-        _fertilizerGrowthBonus   = 0f;
+        ActiveCrop             = null;
+        CurrentStage           = -1;
+        StageTimer             = 0f;
+        RegrowTimer            = 0f;
+        IsEvolved              = false;
+        EvolvedCharacter       = null;
+        ReadyToEvolveWith      = null;
+        WaterCount             = 0;
+        _fertilizerData        = null;
+        _fertilizerGrowthBonus = 0f;
         Mutations.Clear();
+        _declinedEvolutions.Clear();
         State        = PlotState.Empty;
         StateChanged = true;
         _visual?.ResetPlotColor();
+        _visual?.HideAllOverlays();
     }
+
+#if UNITY_EDITOR
+    public void ForceReadyToEvolveDebug(int pathIndex = 0)
+    {
+        if (ActiveCrop?.evolutionPaths == null || ActiveCrop.evolutionPaths.Count == 0)
+        {
+            TutorialConsole.Warn($"Debug: {ActiveCrop?.cropName ?? "crop"} has no evolution paths.");
+            return;
+        }
+        int idx  = Mathf.Clamp(pathIndex, 0, ActiveCrop.evolutionPaths.Count - 1);
+        var path = ActiveCrop.evolutionPaths[idx];
+        if (path?.characterData == null)
+        {
+            TutorialConsole.Warn("Debug: evolution path has no CharacterData.");
+            return;
+        }
+        if (State == PlotState.Growing)
+        {
+            State        = PlotState.Ready;
+            StateChanged = true;
+        }
+        ReadyToEvolveWith = path;
+        StateChanged      = true;
+        TutorialConsole.Log($"Debug: {ActiveCrop.cropName} forced → evolve into " +
+            $"{path.characterData.characterName}.");
+    }
+
+    public void ForceWaterCountDebug(int count)
+    {
+        WaterCount = Mathf.Max(0, count);
+        if (WaterCount > 0) _visual?.ShowWateringOverlay();
+        TutorialConsole.Log($"Debug: water count set to {WaterCount}.");
+    }
+
+    public void ForceFertilizerDebug(FertilizerData data)
+    {
+        if (data == null) return;
+        _fertilizerData        = data;
+        _fertilizerGrowthBonus = data.growthBonus;
+        _visual?.ShowFertilizerOverlay(data);
+        TutorialConsole.Log($"Debug: fertilizer set to {data.fertilizerName}.");
+    }
+#endif
 }

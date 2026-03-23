@@ -1,106 +1,127 @@
 ﻿using UnityEngine;
 
+// Processes the active tool against whatever the player clicks.
+// Attached to the same GameObject as the main input manager, or a dedicated ToolUser object.
 public class ToolUser : MonoBehaviour
 {
-    public static ToolUser Instance;
-
-    private Camera   _mainCamera;
-    private Collider _lastHitCollider;
-
-    void Awake()
-    {
-        Instance    = this;
-        _mainCamera = Camera.main;
-    }
-
     void Update()
     {
-        if (ShopUI.IsOpen)        return;
-        if (DialoguePanel.IsOpen) return;
-        if (PlacementController.Instance != null &&
-            PlacementController.Instance.IsPlacing) return;
+        if (DialoguePanel.IsOpen)        return;
+        if (EvolutionConfirmPanel.IsOpen) return;
+        if (ShopUI.IsOpen)               return;
+        if (InventoryPanel.IsOpen)       return;
 
-        if (Input.GetMouseButtonUp(0)) { _lastHitCollider = null; return; }
-        if (!Input.GetMouseButton(0))  return;
+        var slot = Inventory.Instance.SelectedSlot;
+        if (slot == null || slot.IsEmpty) return;
+        if (slot.Type != InventoryItemType.Tool) return;
 
-        if (UnityEngine.EventSystems.EventSystem.current != null &&
-            UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject()) return;
+        var tool = slot.Tool;
+        if (tool == null) return;
 
-        InventorySlot selected = Inventory.Instance.SelectedSlot;
-        if (selected == null || selected.Type != InventoryItemType.Tool) return;
+        if (tool.toolType == ToolType.Shovel)
+        {
+            HandleShovel();
+            return;
+        }
 
-        Ray ray = _mainCamera.ScreenPointToRay(Input.mousePosition);
-        if (!Physics.Raycast(ray, out RaycastHit hit, 200f)) return;
-        if (hit.collider == _lastHitCollider) return;
+        // Non-shovel tools activate on mouse-down over a plot
+        if (!Input.GetMouseButtonDown(0)) return;
 
-        FarmPlot plot = hit.collider.GetComponent<FarmPlot>();
+        var plot = RaycastPlot();
         if (plot == null) return;
 
-        _lastHitCollider = hit.collider;
-        bool success = UseTool(selected.Tool, plot);
-        if (success && selected.Tool.isConsumable)
-            Inventory.Instance.UseTool(selected.Tool);
-    }
-
-    bool UseTool(ToolData tool, FarmPlot plot)
-    {
         switch (tool.toolType)
         {
-            case ToolType.Shovel:      return UseShovel(plot);
-            case ToolType.WateringCan: return UseWateringCan(plot);
-            case ToolType.Fertilizer:  return UseFertilizer(plot, tool);
-            default:                   return false;
+            case ToolType.WateringCan:  UseWateringCan(plot, tool);  break;
+            case ToolType.Fertilizer:   UseFertilizer(plot, tool);   break;
         }
     }
 
-    bool UseShovel(FarmPlot plot)
+    // ── Shovel ────────────────────────────────────────────────
+
+    void HandleShovel()
     {
-        // Evolved characters cannot be removed — the player forms a bond with them
+        if (!Input.GetMouseButtonDown(0)) return;
+
+        var plot = RaycastPlot();
+        if (plot == null) return;
+
         if (plot.State == FarmPlot.PlotState.Evolved)
         {
             string name = plot.EvolvedCharacter?.characterName ?? "this character";
-            TutorialConsole.Warn($"You cannot remove {name}.");
-            return false;
+            TutorialConsole.Warn($"You cannot remove {name}'s plot.");
+            return;
         }
+
+        if (plot.State != FarmPlot.PlotState.Empty)
+        {
+            TutorialConsole.Warn("Remove the plant before removing the plot.");
+            return;
+        }
+
         plot.RemovePlot();
-        AudioManager.Play(SoundEvent.PlotRemoved);
-        TutorialConsole.Log("Removed farm plot.");
-        return true;
+        Inventory.Instance.UseTool(plot.GetComponent<FarmPlot>() != null
+            ? Inventory.Instance.SelectedSlot.Tool : null);
     }
 
-    bool UseWateringCan(FarmPlot plot)
+    // ── Watering can ─────────────────────────────────────────
+
+    void UseWateringCan(FarmPlot plot, ToolData tool)
     {
+        if (plot.State == FarmPlot.PlotState.Evolved)
+        {
+            string name = plot.EvolvedCharacter?.characterName ?? "the character";
+            TutorialConsole.Log($"You watered {name}'s plot. How thoughtful!");
+            return;
+        }
+
         if (plot.State != FarmPlot.PlotState.Growing)
         {
-            TutorialConsole.Warn("Plant a seed first before watering.");
-            return false;
+            TutorialConsole.Warn("Watering can only be used on a growing plant.");
+            return;
         }
-        if (plot.IsWatered)
-        {
-            TutorialConsole.Warn("Already watered.");
-            return false;
-        }
+
         plot.ApplyWatering();
-        AudioManager.Play(SoundEvent.WateringCan);
-        TutorialConsole.Log($"Watered {plot.ActiveCrop.cropName}! Growth speed doubled.");
-        return true;
+        if (tool.isConsumable) Inventory.Instance.UseTool(tool);
+
+        AudioManager.Play(SoundEvent.PlotWatered);
     }
 
-    bool UseFertilizer(FarmPlot plot, ToolData tool)
+    // ── Fertilizer ────────────────────────────────────────────
+
+    void UseFertilizer(FarmPlot plot, ToolData tool)
     {
-        if (plot.State != FarmPlot.PlotState.Growing)
+        if (plot.State != FarmPlot.PlotState.Empty)
         {
-            TutorialConsole.Warn("Plant a seed first before fertilizing.");
-            return false;
+            TutorialConsole.Warn("Fertilizer cannot be used on an occupied farm plot.");
+            return;
         }
+
+        if (plot.IsFertilized)
+        {
+            TutorialConsole.Warn("This plot is already fertilized.");
+            return;
+        }
+
         if (tool.fertilizerData == null)
         {
-            Debug.LogWarning($"ToolUser: {tool.toolName} has no FertilizerData assigned " +
-                "in the Inspector.");
-            return false;
+            Debug.LogError($"ToolUser: {tool.toolName} has no FertilizerData assigned.");
+            return;
         }
+
         plot.ApplyFertilizer(tool.fertilizerData);
-        AudioManager.Play(SoundEvent.WateringCan); // reuse until a dedicated Fertilizer sound is added
-        return true;
+        if (tool.isConsumable) Inventory.Instance.UseTool(tool);
+
+        AudioManager.Play(SoundEvent.FertilizerApplied);
+    }
+
+    // ── Raycast ───────────────────────────────────────────────
+
+    static FarmPlot RaycastPlot()
+    {
+        var ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        if (Physics.Raycast(ray, out var hit, 100f))
+            return hit.collider.GetComponent<FarmPlot>();
+        return null;
     }
 }

@@ -1,15 +1,20 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
+using UnityEngine.Rendering;
 using TMPro;
 
 [RequireComponent(typeof(FarmPlot))]
 public class FarmPlotVisual : MonoBehaviour
 {
+    private const float FertilizerOverlayOffset = 0.005f;
+    private const float WateringOverlayOffset   = 0.010f;
+    private static readonly Color WateringOverlayColor = new Color(0.10f, 0.06f, 0.02f, 0.55f);
+
     private FarmPlot           plot;
     private FarmPlot.PlotState lastState;
-    private int                lastStage = -1;
+    private int                lastStage          = -1;
+    private bool               _lastReadyToEvolve = false;
 
     private GameObject      cropObject;
     private GameObject      ghostObject;
@@ -23,12 +28,14 @@ public class FarmPlotVisual : MonoBehaviour
     private Color    _originalPlotColor;
     private Color    _currentBaseColor;
 
+    private GameObject _fertilizerOverlayGo;
+    private GameObject _wateringOverlayGo;
+
     public Color OriginalPlotColor => _originalPlotColor;
 
     private Camera _mainCamera;
-
-    private bool _burialAnimPlaying = false;
-    private bool _isHovering        = false;
+    private bool   _burialAnimPlaying = false;
+    private bool   _isHovering        = false;
 
     // ── Setup ─────────────────────────────────────────────────
 
@@ -52,28 +59,31 @@ public class FarmPlotVisual : MonoBehaviour
 
     void Update()
     {
-        if (plot.StateChanged || plot.CurrentStage != lastStage || plot.State != lastState)
+        bool stateOrStageChanged = plot.StateChanged
+            || plot.CurrentStage != lastStage
+            || plot.State != lastState;
+        bool evolveChanged = (plot.ReadyToEvolveWith != null) != _lastReadyToEvolve;
+
+        if (stateOrStageChanged || evolveChanged)
         {
-            lastState = plot.State;
-            lastStage = plot.CurrentStage;
+            lastState          = plot.State;
+            lastStage          = plot.CurrentStage;
+            _lastReadyToEvolve = plot.ReadyToEvolveWith != null;
             RefreshVisual();
         }
 
-        // Ready — bouncy pulse
-        if (plot.State == FarmPlot.PlotState.Ready && cropObject != null)
+        if (plot.State == FarmPlot.PlotState.Ready && plot.ReadyToEvolveWith == null
+            && cropObject != null)
         {
-            GrowthStageVisual visual = GetStageVisual(plot.ActiveCrop, plot.CurrentStage);
-            float pulse = 1f + Mathf.Sin(Time.time * 3f) * 0.08f;
-            float s     = visual.scale * pulse;
+            GrowthStageVisual v = GetStageVisual(plot.ActiveCrop, plot.CurrentStage);
+            float s = v.scale * (1f + Mathf.Sin(Time.time * 3f) * 0.08f);
             cropObject.transform.localScale = new Vector3(s, s, s);
         }
 
-        // Evolved — gentle pulse signals interactability
         if (plot.State == FarmPlot.PlotState.Evolved && cropObject != null)
         {
-            GrowthStageVisual visual = GetStageVisual(plot.ActiveCrop, plot.CurrentStage);
-            float pulse = 1f + Mathf.Sin(Time.time * 1.5f) * 0.04f;
-            float s     = visual.scale * pulse;
+            GrowthStageVisual v = GetStageVisual(plot.ActiveCrop, plot.CurrentStage);
+            float s = v.scale * (1f + Mathf.Sin(Time.time * 1.5f) * 0.04f);
             cropObject.transform.localScale = new Vector3(s, s, s);
         }
 
@@ -88,13 +98,13 @@ public class FarmPlotVisual : MonoBehaviour
     {
         _isHovering = true;
         if (ShopUI.IsOpen) return;
-
         switch (plot.State)
         {
             case FarmPlot.PlotState.Empty:
                 if (Inventory.Instance.SelectedSeed == null) return;
                 if (Inventory.Instance.GetSeedCount(Inventory.Instance.SelectedSeed) <= 0) return;
-                if (plotRenderer != null) plotRenderer.material.color = _currentBaseColor * 1.3f;
+                if (plotRenderer != null)
+                    plotRenderer.material.color = _currentBaseColor * 1.3f;
                 ShowGhost();
                 break;
             case FarmPlot.PlotState.Growing:
@@ -107,25 +117,23 @@ public class FarmPlotVisual : MonoBehaviour
     public void OnHoverStay()
     {
         _isHovering = true;
-        if ((plot.State == FarmPlot.PlotState.Empty) && ghostObject == null)     OnHoverEnter();
+        if (plot.State == FarmPlot.PlotState.Empty && ghostObject == null) OnHoverEnter();
         if ((plot.State == FarmPlot.PlotState.Growing ||
-             plot.State == FarmPlot.PlotState.Regrowing) && timerLabel == null)  ShowTimerLabel();
+             plot.State == FarmPlot.PlotState.Regrowing) && timerLabel == null) ShowTimerLabel();
     }
 
     public void OnHoverExit()
     {
         _isHovering = false;
         if (plotRenderer != null) plotRenderer.material.color = _currentBaseColor;
-        HideGhost();
-        HideTimerLabel();
-        HideReadyLabel();
+        HideGhost(); HideTimerLabel(); HideReadyLabel();
     }
 
     // ── Soil color ────────────────────────────────────────────
 
-    public void ApplySoilColor(Color color)
+    public void ApplySoilColor(Color? color)
     {
-        _currentBaseColor = color;
+        _currentBaseColor = color ?? _originalPlotColor;
         if (plotRenderer != null && !_isHovering)
             plotRenderer.material.color = _currentBaseColor;
     }
@@ -137,50 +145,83 @@ public class FarmPlotVisual : MonoBehaviour
             plotRenderer.material.color = _currentBaseColor;
     }
 
-    // ── Watering ──────────────────────────────────────────────
+    // ── Overlay quads ─────────────────────────────────────────
 
-    public void ShowWateringEffect()
+    GameObject CreateOverlayQuad(string name, float heightOffset)
     {
-        StartCoroutine(TintRoutine(new Color(0.25f, 0.12f, 0.04f), 1f));
+        var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        go.name = name;
+        var col = go.GetComponent<Collider>();
+        if (col != null) Destroy(col);
+
+        float plotHalfY = transform.lossyScale.y * 0.5f;
+        go.transform.position = new Vector3(
+            transform.position.x,
+            transform.position.y + plotHalfY + heightOffset,
+            transform.position.z);
+        go.transform.rotation   = Quaternion.Euler(90f, transform.eulerAngles.y, 0f);
+        go.transform.localScale = new Vector3(transform.lossyScale.x, transform.lossyScale.z, 1f);
+        return go;
     }
 
-    // ── Fertilizer ────────────────────────────────────────────
-
-    public void ShowFertilizerEffect(Color tintColor)
+    static Material CreateTransparentMaterial(Color color, Texture2D texture = null)
     {
-        Color target = Color.Lerp(_currentBaseColor, tintColor, 0.35f);
-        StartCoroutine(TintRoutine(target, 1.5f));
+        var shader = Shader.Find("Universal Render Pipeline/Unlit")
+                  ?? Shader.Find("Unlit/Transparent")
+                  ?? Shader.Find("Standard");
+        var mat = new Material(shader);
+        mat.SetFloat("_Surface",  1f);
+        mat.SetFloat("_Blend",    0f);
+        mat.SetFloat("_ZWrite",   0f);
+        mat.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+        mat.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+        mat.SetColor("_BaseColor", color);
+        if (texture != null) mat.SetTexture("_BaseMap", texture);
+        mat.renderQueue = 3002;
+        mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+        return mat;
     }
 
-    IEnumerator TintRoutine(Color targetColor, float duration)
+    public void ShowFertilizerOverlay(FertilizerData data)
     {
-        if (plotRenderer == null) yield break;
-        float elapsed    = 0f;
-        Color startColor = _currentBaseColor;
-        while (elapsed < duration)
-        {
-            elapsed += Time.deltaTime;
-            float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
-            _currentBaseColor = Color.Lerp(startColor, targetColor, t);
-            if (!_isHovering) plotRenderer.material.color = _currentBaseColor;
-            yield return null;
-        }
-        _currentBaseColor = targetColor;
-        if (!_isHovering) plotRenderer.material.color = _currentBaseColor;
+        if (_fertilizerOverlayGo != null) return;
+        _fertilizerOverlayGo = CreateOverlayQuad("FertilizerOverlay", FertilizerOverlayOffset);
+        var mat = CreateTransparentMaterial(new Color(1f, 1f, 1f, 0.90f), data.overlayTexture);
+        _fertilizerOverlayGo.GetComponent<Renderer>().material = mat;
     }
 
-    public void ResetWateringColor() => ResetPlotColor();
+    public void HideFertilizerOverlay()
+    {
+        if (_fertilizerOverlayGo != null) { Destroy(_fertilizerOverlayGo); _fertilizerOverlayGo = null; }
+    }
+
+    public void ShowWateringOverlay()
+    {
+        if (_wateringOverlayGo != null) return;
+        _wateringOverlayGo = CreateOverlayQuad("WateringOverlay", WateringOverlayOffset);
+        var mat = CreateTransparentMaterial(WateringOverlayColor);
+        _wateringOverlayGo.GetComponent<Renderer>().material = mat;
+    }
+
+    public void HideWateringOverlay()
+    {
+        if (_wateringOverlayGo != null) { Destroy(_wateringOverlayGo); _wateringOverlayGo = null; }
+    }
+
+    public void HideAllOverlays()
+    {
+        HideFertilizerOverlay();
+        HideWateringOverlay();
+    }
 
     // ── Burial animation ──────────────────────────────────────
 
     public void PlayBurialAnimation(CropData crop)
     {
-        GrowthStageVisual stageVisual = GetStageVisual(crop, 0);
+        GrowthStageVisual sv = GetStageVisual(crop, 0);
         _burialAnimPlaying = true;
-        VFXManager.PlayBurial(
-            transform.position,
-            transform.lossyScale.y * 0.5f,
-            stageVisual,
+        VFXManager.PlayBurial(transform.position, transform.lossyScale.y * 0.5f, sv,
             onComplete: () => { _burialAnimPlaying = false; RefreshVisual(); });
     }
 
@@ -188,119 +229,135 @@ public class FarmPlotVisual : MonoBehaviour
 
     void RefreshVisual()
     {
+        var rend = cropObject?.GetComponent<Renderer>();
+
         switch (plot.State)
         {
             case FarmPlot.PlotState.Empty:
+                if (rend != null) VFXManager.StopGlow(rend);
                 ClearCropVisual();
                 return;
 
             case FarmPlot.PlotState.Regrowing:
                 if (_burialAnimPlaying) return;
+                if (rend != null) VFXManager.StopGlow(rend);
                 ClearCropVisual();
                 if (plot.ActiveCrop?.strippedPrefab != null)
                 {
-                    var lastVisual = GetStageVisual(plot.ActiveCrop,
+                    var lv = GetStageVisual(plot.ActiveCrop,
                         plot.ActiveCrop.growthStages.Length - 1);
-                    var stripped = new GrowthStageVisual
+                    cropObject = SpawnVisual(new GrowthStageVisual
                     {
                         visualPrefab = plot.ActiveCrop.strippedPrefab,
-                        stageColor   = lastVisual.stageColor,
-                        scale        = lastVisual.scale
-                    };
-                    cropObject = SpawnVisual(stripped);
+                        stageColor   = lv.stageColor,
+                        scale        = lv.scale
+                    });
+                }
+                return;
+
+            case FarmPlot.PlotState.Ready:
+                if (_burialAnimPlaying) return;
+                if (plot.ActiveCrop == null || plot.CurrentStage < 0) return;
+
+                var visual = GetStageVisual(plot.ActiveCrop, plot.CurrentStage);
+                if (cropObject == null)
+                {
+                    ClearCropVisual();
+                    cropObject = SpawnVisual(visual);
+                }
+
+                var cropRend = cropObject?.GetComponent<Renderer>();
+                if (cropRend == null) return;
+
+                if (plot.ReadyToEvolveWith != null)
+                {
+                    VFXManager.StopGlow(cropRend);
+                    VFXManager.StartEvolutionGlow(cropRend);
+                }
+                else
+                {
+                    VFXManager.StopGlow(cropRend);
+                    //VFXManager.StartGlow(cropRend); // disabled - harvest glow turned off
                 }
                 return;
 
             case FarmPlot.PlotState.Evolved:
                 if (cropObject == null)
                 {
-                    var baseVisual = GetStageVisual(plot.ActiveCrop, plot.CurrentStage);
-                    if (plot.EvolvedCharacter?.evolvedModelPrefab != null)
-                    {
-                        var overrideVisual = new GrowthStageVisual
-                        {
-                            visualPrefab = plot.EvolvedCharacter.evolvedModelPrefab,
-                            stageColor   = baseVisual.stageColor,
-                            scale        = baseVisual.scale
-                        };
-                        ClearCropVisual();
-                        cropObject = SpawnVisual(overrideVisual);
-                    }
-                    else
-                    {
-                        ClearCropVisual();
-                        cropObject = SpawnVisual(baseVisual);
-                    }
+                    var baseV = GetStageVisual(plot.ActiveCrop, plot.CurrentStage);
+                    ClearCropVisual();
+                    cropObject = SpawnVisual(
+                        plot.EvolvedCharacter?.evolvedModelPrefab != null
+                            ? new GrowthStageVisual
+                              {
+                                  visualPrefab = plot.EvolvedCharacter.evolvedModelPrefab,
+                                  stageColor   = baseV.stageColor,
+                                  scale        = baseV.scale
+                              }
+                            : baseV);
                 }
+                if (rend != null) VFXManager.StopGlow(rend);
                 ShowEvolvedNameLabel();
                 return;
 
             default:
                 if (_burialAnimPlaying) return;
                 if (plot.ActiveCrop == null || plot.CurrentStage < 0) return;
-                GrowthStageVisual visual = GetStageVisual(plot.ActiveCrop, plot.CurrentStage);
+                var vis = GetStageVisual(plot.ActiveCrop, plot.CurrentStage);
+                if (rend != null) VFXManager.StopGlow(rend);
                 ClearCropVisual();
-                cropObject = SpawnVisual(visual);
-                if (plot.State != FarmPlot.PlotState.Ready)
-                    StartCoroutine(ScalePop(cropObject, visual.scale));
-                break;
+                cropObject = SpawnVisual(vis);
+                StartCoroutine(ScalePop(cropObject, vis.scale));
+                return;
         }
     }
 
     void ClearCropVisual()
     {
         if (cropObject == null) return;
-        var rend = cropObject.GetComponent<Renderer>();
-        if (rend != null) VFXManager.StopGlow(rend);
+        var r = cropObject.GetComponent<Renderer>();
+        if (r != null) VFXManager.StopGlow(r);
         Destroy(cropObject);
         cropObject = null;
     }
 
-    // ── Timer label (Growing + Regrowing) ─────────────────────
+    // ── Timer label ───────────────────────────────────────────
 
     void ShowTimerLabel()
     {
         if (timerLabel != null) return;
-        var canvas = GetLabelCanvas();
-        if (canvas == null) return;
-
+        var canvas = GetLabelCanvas(); if (canvas == null) return;
         timerLabel = new GameObject("TimerLabel",
             typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         timerLabel.transform.SetParent(canvas.transform, false);
-
-        var tmp               = timerLabel.GetComponent<TextMeshProUGUI>();
-        tmp.fontSize          = FloatingText.ScaledFontSize(22);
-        tmp.fontStyle         = FontStyles.Bold;
-        tmp.alignment         = TextAlignmentOptions.Center;
-        tmp.color             = Color.white;
-        tmp.raycastTarget     = false;
+        var tmp           = timerLabel.GetComponent<TextMeshProUGUI>();
+        tmp.fontSize      = FloatingText.ScaledFontSize(22);
+        tmp.fontStyle     = FontStyles.Bold;
+        tmp.alignment     = TextAlignmentOptions.Center;
+        tmp.color         = Color.white;
+        tmp.raycastTarget = false;
         timerLabel.GetComponent<RectTransform>().sizeDelta = new Vector2(160f, 40f);
     }
 
     void UpdateTimerLabel()
     {
         if (timerLabel == null) return;
-
+        string text = "";
         if (plot.State == FarmPlot.PlotState.Growing && plot.ActiveCrop != null)
         {
-            float remaining = plot.ActiveCrop.growthStages[plot.CurrentStage].duration
-                              - plot.StageTimer;
+            float rem = plot.ActiveCrop.growthStages[plot.CurrentStage].duration - plot.StageTimer;
             for (int i = plot.CurrentStage + 1; i < plot.ActiveCrop.growthStages.Length - 1; i++)
-                remaining += plot.ActiveCrop.growthStages[i].duration;
-            timerLabel.GetComponent<TextMeshProUGUI>().text = FormatTime(remaining);
+                rem += plot.ActiveCrop.growthStages[i].duration;
+            text = FormatTime(rem);
         }
         else if (plot.State == FarmPlot.PlotState.Regrowing)
         {
-            timerLabel.GetComponent<TextMeshProUGUI>().text = FormatTime(plot.RegrowTimer);
+            text = FormatTime(plot.RegrowTimer);
         }
-        else
-        {
-            HideTimerLabel();
-            return;
-        }
+        else { HideTimerLabel(); return; }
 
-        FloatingText.PositionOnCanvas(
-            timerLabel.GetComponent<RectTransform>(),
+        timerLabel.GetComponent<TextMeshProUGUI>().text = text;
+        FloatingText.PositionOnCanvas(timerLabel.GetComponent<RectTransform>(),
             transform.position + Vector3.up * 1.5f);
     }
 
@@ -314,42 +371,35 @@ public class FarmPlotVisual : MonoBehaviour
     void ShowReadyLabel()
     {
         if (readyLabel != null || plot.ActiveCrop == null) return;
-        var canvas = GetLabelCanvas();
-        if (canvas == null) return;
+        var canvas = GetLabelCanvas(); if (canvas == null) return;
 
-        int fontSize = FloatingText.ScaledFontSize(28);
+        int fs = FloatingText.ScaledFontSize(28);
         readyLabel = new GameObject("ReadyLabel", typeof(RectTransform));
         readyLabel.transform.SetParent(canvas.transform, false);
         readyLabel.GetComponent<RectTransform>().sizeDelta = new Vector2(400f, 80f);
-
         readyNameTmp = MakeTMP(readyLabel.transform, "Name",
-            new Vector2(0f, 0.5f), new Vector2(1f, 1f), fontSize);
+            new Vector2(0f, 0.5f), new Vector2(1f, 1f), fs);
         readyMutTmp  = MakeTMP(readyLabel.transform, "Muts",
-            new Vector2(0f, 0f),   new Vector2(1f, 0.5f), fontSize);
+            new Vector2(0f, 0f),   new Vector2(1f, 0.5f), fs);
         RefreshReadyLabel();
     }
 
     void RefreshReadyLabel()
     {
         if (readyLabel == null || plot.ActiveCrop == null) return;
-        if (readyNameTmp == null || readyMutTmp == null)   return;
-
-        int    fontSize    = FloatingText.ScaledFontSize(28);
-        Color  rarityColor = RarityUtility.RarityColor(plot.ActiveCrop.rarity);
-        string rarityHex   = "#" + ColorUtility.ToHtmlStringRGB(rarityColor);
-        readyNameTmp.text     = $"<color={rarityHex}>{plot.ActiveCrop.cropName}</color>";
-        readyNameTmp.fontSize = fontSize;
-
+        if (readyNameTmp == null || readyMutTmp == null) return;
+        int    fs  = FloatingText.ScaledFontSize(28);
+        string hex = "#" + ColorUtility.ToHtmlStringRGB(
+            RarityUtility.RarityColor(plot.ActiveCrop.rarity));
+        readyNameTmp.text     = $"<color={hex}>{plot.ActiveCrop.cropName}</color>";
+        readyNameTmp.fontSize = fs;
         if (plot.Mutations != null && plot.Mutations.Count > 0)
         {
             var parts = new List<string>();
             foreach (var m in plot.Mutations)
-            {
-                string hex = "#" + ColorUtility.ToHtmlStringRGB(m.tintColor);
-                parts.Add($"<color={hex}>{m.mutationName}</color>");
-            }
+                parts.Add($"<color=#{ColorUtility.ToHtmlStringRGB(m.tintColor)}>{m.mutationName}</color>");
             readyMutTmp.text     = string.Join(" + ", parts);
-            readyMutTmp.fontSize = fontSize;
+            readyMutTmp.fontSize = fs;
             readyMutTmp.gameObject.SetActive(true);
             readyLabel.GetComponent<RectTransform>().sizeDelta = new Vector2(500f, 80f);
         }
@@ -364,14 +414,11 @@ public class FarmPlotVisual : MonoBehaviour
     void UpdateReadyLabel()
     {
         if (plot.State != FarmPlot.PlotState.Ready || !_isHovering)
-        {
-            HideReadyLabel(); return;
-        }
+        { HideReadyLabel(); return; }
         if (readyLabel == null) ShowReadyLabel();
         if (readyLabel == null) return;
         if (plot.StateChanged) RefreshReadyLabel();
-        FloatingText.PositionOnCanvas(
-            readyLabel.GetComponent<RectTransform>(),
+        FloatingText.PositionOnCanvas(readyLabel.GetComponent<RectTransform>(),
             transform.position + Vector3.up * 2f);
     }
 
@@ -380,28 +427,21 @@ public class FarmPlotVisual : MonoBehaviour
         if (readyLabel != null)
         {
             Destroy(readyLabel);
-            readyLabel   = null;
-            readyNameTmp = null;
-            readyMutTmp  = null;
+            readyLabel = null; readyNameTmp = null; readyMutTmp = null;
         }
     }
 
-    // ── Evolved name label (permanent) ───────────────────────
+    // ── Evolved name label ────────────────────────────────────
 
     void ShowEvolvedNameLabel()
     {
-        if (evolvedNameLabel != null) return;
-        if (plot.EvolvedCharacter == null) return;
-        var canvas = GetLabelCanvas();
-        if (canvas == null) return;
-
+        if (evolvedNameLabel != null || plot.EvolvedCharacter == null) return;
+        var canvas = GetLabelCanvas(); if (canvas == null) return;
         evolvedNameLabel = new GameObject("EvolvedNameLabel",
             typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         evolvedNameLabel.transform.SetParent(canvas.transform, false);
-
         var rt       = evolvedNameLabel.GetComponent<RectTransform>();
         rt.sizeDelta = new Vector2(220f, 44f);
-
         var tmp           = evolvedNameLabel.GetComponent<TextMeshProUGUI>();
         tmp.text          = plot.EvolvedCharacter.characterName;
         tmp.fontSize      = FloatingText.ScaledFontSize(24);
@@ -416,8 +456,7 @@ public class FarmPlotVisual : MonoBehaviour
     {
         if (plot.State != FarmPlot.PlotState.Evolved) return;
         if (evolvedNameLabel == null) { ShowEvolvedNameLabel(); return; }
-        FloatingText.PositionOnCanvas(
-            evolvedNameLabel.GetComponent<RectTransform>(),
+        FloatingText.PositionOnCanvas(evolvedNameLabel.GetComponent<RectTransform>(),
             transform.position + Vector3.up * 2.5f);
     }
 
@@ -433,10 +472,7 @@ public class FarmPlotVisual : MonoBehaviour
             ghostObject.GetComponent<Renderer>().material = PlacementController.GhostValid;
     }
 
-    void HideGhost()
-    {
-        if (ghostObject != null) { Destroy(ghostObject); ghostObject = null; }
-    }
+    void HideGhost() { if (ghostObject != null) { Destroy(ghostObject); ghostObject = null; } }
 
     // ── Scale pop ─────────────────────────────────────────────
 
@@ -456,12 +492,12 @@ public class FarmPlotVisual : MonoBehaviour
         if (target != null) target.transform.localScale = Vector3.one * finalScale;
     }
 
-    // ── Shared helpers ────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────
 
-    GrowthStageVisual GetStageVisual(CropData crop, int stageIndex)
+    GrowthStageVisual GetStageVisual(CropData crop, int idx)
     {
-        if (crop.stageVisuals != null && stageIndex < crop.stageVisuals.Length)
-            return crop.stageVisuals[stageIndex];
+        if (crop?.stageVisuals != null && idx < crop.stageVisuals.Length)
+            return crop.stageVisuals[idx];
         return new GrowthStageVisual { stageColor = Color.green, scale = 0.3f };
     }
 
@@ -474,20 +510,17 @@ public class FarmPlotVisual : MonoBehaviour
         go.transform.SetParent(null);
         foreach (var col in go.GetComponentsInChildren<Collider>()) Destroy(col);
 
-        float   s       = visual.scale;
-        Vector3 plotTop = transform.position + Vector3.up * (transform.lossyScale.y * 0.5f);
+        float   s   = visual.scale;
+        Vector3 top = transform.position + Vector3.up * (transform.lossyScale.y * 0.5f);
         go.transform.localScale = new Vector3(s, s, s);
         go.transform.position   = visual.visualPrefab != null
-            ? plotTop
-            : plotTop + Vector3.up * (s * 0.5f);
+            ? top : top + Vector3.up * (s * 0.5f);
 
         if (visual.visualPrefab == null)
             go.GetComponent<Renderer>().material = VFXManager.CreateMaterial(visual.stageColor);
-
         return go;
     }
 
-    // textWrappingMode replaces obsolete enableWordWrapping throughout
     TextMeshProUGUI MakeTMP(Transform parent, string name,
         Vector2 anchorMin, Vector2 anchorMax, int fontSize)
     {
@@ -497,14 +530,14 @@ public class FarmPlotVisual : MonoBehaviour
         var rt       = go.GetComponent<RectTransform>();
         rt.anchorMin = anchorMin; rt.anchorMax = anchorMax;
         rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
-        var tmp               = go.GetComponent<TextMeshProUGUI>();
-        tmp.richText          = true;
-        tmp.fontSize          = fontSize;
-        tmp.fontStyle         = FontStyles.Bold;
-        tmp.alignment         = TextAlignmentOptions.Center;
-        tmp.color             = Color.white;
-        tmp.textWrappingMode  = TextWrappingModes.NoWrap; // replaces obsolete enableWordWrapping = false
-        tmp.raycastTarget     = false;
+        var tmp              = go.GetComponent<TextMeshProUGUI>();
+        tmp.richText         = true;
+        tmp.fontSize         = fontSize;
+        tmp.fontStyle        = FontStyles.Bold;
+        tmp.alignment        = TextAlignmentOptions.Center;
+        tmp.color            = Color.white;
+        tmp.textWrappingMode = TextWrappingModes.NoWrap;
+        tmp.raycastTarget    = false;
         return tmp;
     }
 
@@ -522,10 +555,9 @@ public class FarmPlotVisual : MonoBehaviour
         _burialAnimPlaying = false;
         _isHovering        = false;
         ResetPlotColor();
+        HideAllOverlays();
         ClearCropVisual();
-        HideGhost();
-        HideTimerLabel();
-        HideReadyLabel();
+        HideGhost(); HideTimerLabel(); HideReadyLabel();
         if (evolvedNameLabel != null) { Destroy(evolvedNameLabel); evolvedNameLabel = null; }
     }
 
@@ -536,5 +568,6 @@ public class FarmPlotVisual : MonoBehaviour
         if (timerLabel       != null) Destroy(timerLabel);
         if (readyLabel       != null) Destroy(readyLabel);
         if (evolvedNameLabel != null) Destroy(evolvedNameLabel);
+        HideAllOverlays();
     }
 }

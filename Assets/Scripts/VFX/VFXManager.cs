@@ -15,12 +15,7 @@ public class VFXManager : MonoBehaviour
     private readonly Dictionary<Renderer, Coroutine> _activeGlows
         = new Dictionary<Renderer, Coroutine>();
 
-    // ── Lifecycle ─────────────────────────────────────────────
-
-    void Awake()
-    {
-        Instance = this;
-    }
+    void Awake() { Instance = this; }
 
     // ── Public API ────────────────────────────────────────────
 
@@ -28,8 +23,7 @@ public class VFXManager : MonoBehaviour
         GrowthStageVisual visual, System.Action onComplete = null)
     {
         if (!IsReady(out var mgr)) { onComplete?.Invoke(); return; }
-        mgr.StartCoroutine(mgr.BurialRoutine(
-            plotPosition, plotHalfHeight, visual, onComplete));
+        mgr.StartCoroutine(mgr.BurialRoutine(plotPosition, plotHalfHeight, visual, onComplete));
     }
 
     public static void PlayDrop(GameObject target, Vector3 finalPosition)
@@ -42,8 +36,14 @@ public class VFXManager : MonoBehaviour
     {
         if (!IsReady(out var mgr) || rend == null) return;
         StopGlow(rend);
-        var c = mgr.StartCoroutine(mgr.GlowRoutine(rend));
-        mgr._activeGlows[rend] = c;
+        mgr._activeGlows[rend] = mgr.StartCoroutine(mgr.GlowRoutine(rend));
+    }
+
+    public static void StartEvolutionGlow(Renderer rend)
+    {
+        if (!IsReady(out var mgr) || rend == null) return;
+        StopGlow(rend);
+        mgr._activeGlows[rend] = mgr.StartCoroutine(mgr.EvolutionGlowRoutine(rend));
     }
 
     public static void StopGlow(Renderer rend)
@@ -54,7 +54,7 @@ public class VFXManager : MonoBehaviour
             if (c != null) mgr.StopCoroutine(c);
             mgr._activeGlows.Remove(rend);
         }
-        rend.material.DisableKeyword("_EMISSION");
+        if (rend != null) rend.material.DisableKeyword("_EMISSION");
     }
 
     public static Material CreateMaterial(Color color)
@@ -79,32 +79,23 @@ public class VFXManager : MonoBehaviour
             : GameObject.CreatePrimitive(PrimitiveType.Sphere);
 
         seed.transform.localScale = Vector3.one * visual.scale;
-
-        foreach (var col in seed.GetComponentsInChildren<Collider>())
-            Destroy(col);
+        foreach (var col in seed.GetComponentsInChildren<Collider>()) Destroy(col);
 
         var rend = seed.GetComponent<Renderer>();
         if (rend != null && visual.visualPrefab == null)
             rend.material = CreateMaterial(visual.stageColor);
 
-        // Prefab origin sits on plot surface — sphere needs radius offset
         Vector3 finalPos = visual.visualPrefab != null
             ? new Vector3(plotPos.x, plotPos.y + plotHalfHeight,                        plotPos.z)
             : new Vector3(plotPos.x, plotPos.y + plotHalfHeight + visual.scale * 0.5f, plotPos.z);
 
         Vector3 hoverPos = finalPos + Vector3.up * db.BurialHoverHeight;
         Vector3 risePos  = hoverPos + Vector3.up * db.BurialRiseHeight;
-
         seed.transform.position = hoverPos;
 
-        // Phase 1 — hover
         yield return new WaitForSeconds(db.BurialHoverDuration);
-
-        // Phase 2 — anticipation rise
-        yield return MoveRoutine(seed, hoverPos, risePos, db.BurialRiseDuration, smooth: true);
-
-        // Phase 3 — plant down to final position
-        yield return MoveRoutine(seed, risePos, finalPos, db.BurialPlantDuration, smooth: true);
+        yield return MoveRoutine(seed, hoverPos, risePos,  db.BurialRiseDuration,  smooth: true);
+        yield return MoveRoutine(seed, risePos,  finalPos, db.BurialPlantDuration, smooth: true);
 
         Destroy(seed);
         onComplete?.Invoke();
@@ -129,11 +120,23 @@ public class VFXManager : MonoBehaviour
                 db.GlowColor * (db.GlowIntensity * pulse));
             yield return null;
         }
-        if (rend != null && _activeGlows.ContainsKey(rend))
-            _activeGlows.Remove(rend);
+        if (rend != null && _activeGlows.ContainsKey(rend)) _activeGlows.Remove(rend);
     }
 
-    // Reusable movement — used by burial and drop
+    IEnumerator EvolutionGlowRoutine(Renderer rend)
+    {
+        if (rend == null) yield break;
+        rend.material.EnableKeyword("_EMISSION");
+        while (rend != null && rend.gameObject != null)
+        {
+            float pulse = (Mathf.Sin(Time.time * db.EvolutionGlowPulseSpeed) + 1f) * 0.5f;
+            rend.material.SetColor("_EmissionColor",
+                db.EvolutionGlowColor * (db.EvolutionGlowIntensity * pulse));
+            yield return null;
+        }
+        if (rend != null && _activeGlows.ContainsKey(rend)) _activeGlows.Remove(rend);
+    }
+
     IEnumerator MoveRoutine(GameObject target, Vector3 from, Vector3 to,
         float duration, bool smooth)
     {
@@ -147,11 +150,8 @@ public class VFXManager : MonoBehaviour
             target.transform.position = Vector3.Lerp(from, to, t);
             yield return null;
         }
-        if (target != null)
-            target.transform.position = to;
+        if (target != null) target.transform.position = to;
     }
-
-    // ── Helpers ───────────────────────────────────────────────
 
     private static bool IsReady(out VFXManager mgr)
     {

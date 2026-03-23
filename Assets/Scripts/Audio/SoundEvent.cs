@@ -9,6 +9,7 @@ public enum SoundEvent
     ShopClosed,
     PlotPlaced,
     PlotRemoved,
+    PlotWatered,
     InsufficientFunds,
     InventoryFull,
     NoSeedSelected,
@@ -16,5 +17,6 @@ public enum SoundEvent
     WateringCan,
     UIClick,
     DialogueOpen,
-    DialogueClose
+    DialogueClose,
+    FertilizerApplied
 }

@@ -14,7 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ToolData
   toolName: Shovel
   toolType: 0
+  tags: []
   buyCost: 50
   rarity: 0
-  toolColor: {r: 0.6, g: 0.4, b: 0.1, a: 1}
+  stockChance: 1
+  toolColor: {r: 0.21960784, g: 0.21960784, b: 0.21960784, a: 1}
   isConsumable: 0
+  buyQuantity: 1
+  fertilizerData: {fileID: 0}

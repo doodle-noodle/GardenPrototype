@@ -6,23 +6,19 @@ using UnityEngine;
 public class HarvestedCrop
 {
     public CropData           Source;
-    public bool               IsEvolved;    // hidden — reserved for future evolution feature
-    public List<MutationData> Mutations     = new List<MutationData>();
+    public List<MutationData> Mutations = new List<MutationData>();
 
-    // Final Value = Base × IsEvolved bonus × M1.sellMultiplier × M2.sellMultiplier × ...
     public int SellValue
     {
         get
         {
             float value = Source.sellValue;
-            if (IsEvolved) value *= 1.5f;
             foreach (var m in Mutations)
                 value *= m.sellMultiplier;
             return Mathf.Max(1, (int)value);
         }
     }
 
-    // Never shows "Evolved" — IsEvolved is fully hidden from players
     public string DisplayName => Source.cropName;
 
     public string MutationDisplay
@@ -34,9 +30,8 @@ public class HarvestedCrop
         }
     }
 
-    public HarvestedCrop(CropData source, bool isEvolved)
+    public HarvestedCrop(CropData source)
     {
-        Source    = source;
-        IsEvolved = isEvolved;
+        Source = source;
     }
 }
